@@ -1,0 +1,18 @@
+dist-newstyle/
+.stack-work/
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+mpyc
+
+# Alex e Happy geram fontes .hs a partir de .x e .y
+src/MiniPython/Lexer/Alex.hs
+src/MiniPython/Parser/Grammar.hs
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz

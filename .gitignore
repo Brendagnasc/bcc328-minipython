@@ -16,3 +16,4 @@ src/MiniPython/Parser/Grammar.hs
 *.out
 *.toc
 *.synctex.gz
+report/.auctex-auto/

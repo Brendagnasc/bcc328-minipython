@@ -1,0 +1,36 @@
+cabal-version:      3.0
+name:               minipython
+version:            0.1.0.0
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Brenda Gabrielle Alves Nascimento
+category:           Language
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall -Wcompat -Widentities -Wredundant-constraints -Werror
+
+library
+    import:           warnings
+    exposed-modules:  MiniPython.CLI
+    build-depends:    base ^>=4.18.2.1
+    hs-source-dirs:   src
+    default-language: Haskell2010
+
+executable mpyc
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:    base ^>=4.18.2.1
+                    , minipython
+    hs-source-dirs:   app
+    default-language: Haskell2010
+
+test-suite minipython-test
+    import:           warnings
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   test
+    build-depends:    base ^>=4.18.2.1
+                    , minipython
+    default-language: Haskell2010

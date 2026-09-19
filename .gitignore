@@ -7,8 +7,7 @@ dist-newstyle/
 mpyc
 
 # Alex e Happy geram fontes .hs a partir de .x e .y
-src/MiniPython/Lexer/Alex.hs
-src/MiniPython/Parser/Grammar.hs
+src/MiniPython/Frontend/Parser/Happy/*.hs
 
 # LaTeX
 *.aux

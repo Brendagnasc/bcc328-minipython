@@ -1,5 +1,5 @@
 -- | Tipos que representam os tokens da linguagem MiniPython.
-module MiniPython.Lexer.Token
+module MiniPython.Frontend.Lexer.Token
   ( Pos (..)
   , Lexeme (..)
   , Token (..)

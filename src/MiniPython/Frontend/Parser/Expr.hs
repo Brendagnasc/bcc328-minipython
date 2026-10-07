@@ -24,11 +24,11 @@ pExpr = do
   m <- accept TIf
   case m of
     Nothing -> pure e
-    Just t -> do
+    Just _ -> do
       cond <- pOr
       _ <- expect TElse "else" "expressao condicional"
       alt <- pExpr
-      pure (ECond (tokPos t) e cond alt)
+      pure (ECond (exprPos e) e cond alt)
 
 -- | ExprOu ::= ExprE { 'or' ExprE }
 pOr :: Parser Expr
@@ -56,10 +56,10 @@ pRel = do
   mop <- peekOp relOps
   case mop of
     Nothing -> pure left
-    Just (t, op) -> do
+    Just (_, op) -> do
       _ <- advance
       right <- pAdd
-      pure (EBin (tokPos t) op left right)
+      pure (EBin (exprPos left) op left right)
 
 -- | ExprAdit ::= ExprMult { ( '+' | '-' ) ExprMult }
 pAdd :: Parser Expr
@@ -89,7 +89,7 @@ pPow = do
   m <- accept TDoubleStar
   case m of
     Nothing -> pure base
-    Just t  -> EBin (tokPos t) Pow base <$> pPow
+    Just _  -> EBin (exprPos base) Pow base <$> pPow
 
 -- | ExprPosfixa ::= Atomo { Posfixo }
 --
@@ -106,16 +106,16 @@ pPostfix = pAtom >>= go
           _ <- advance
           args <- pArgsUntil TRParen
           _ <- expect TRParen ")" "chamada de funcao"
-          go (ECall (tokPos t) acc args)
+          go (ECall (exprPos acc) acc args)
         TLBracket -> do
           _ <- advance
           idx <- pExpr
           _ <- expect TRBracket "]" "acesso indexado"
-          go (EIndex (tokPos t) acc idx)
+          go (EIndex (exprPos acc) acc idx)
         TDot -> do
           _ <- advance
           (_, n) <- expectIdent "acesso a campo"
-          go (EField (tokPos t) acc n)
+          go (EField (exprPos acc) acc n)
         _ -> pure acc
 
 -- | Args ::= Expr { ',' Expr }
@@ -183,10 +183,10 @@ chainLeft next ops = next >>= go
       mop <- peekOp ops
       case mop of
         Nothing -> pure acc
-        Just (t, op) -> do
+        Just (_, op) -> do
           _ <- advance
           right <- next
-          go (EBin (tokPos t) op acc right)
+          go (EBin (exprPos acc) op acc right)
 
 -- | Se o proximo token for um dos operadores da tabela, devolve-o
 -- junto com o operador correspondente, sem consumir.

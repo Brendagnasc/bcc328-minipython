@@ -5,11 +5,13 @@ import MiniPython.Frontend.Lexer.Indent (layout)
 import MiniPython.Frontend.Lexer.MiniPythonLexer (formatLexError, renderToken, scan)
 import MiniPython.Frontend.Lexer.Token (Token)
 import MiniPython.Frontend.Parser.Core (formatParseError)
+import MiniPython.Frontend.Parser.PEG (parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
 import MiniPython.Frontend.Pretty.MiniPythonPretty (pretty)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
+import Text.Megaparsec (errorBundlePretty)
 
 main :: IO ()
 main = do
@@ -32,7 +34,9 @@ run mode file src = do
     ParseRD -> case parseProgram toks of
       Left err  -> abort (formatParseError file err)
       Right ast -> putStrLn (pretty ast)
-    ParsePEG  -> naoImplementado "--parse-peg"
+    ParsePEG -> case parseProgramPEG file toks of
+      Left bundle -> abort (errorBundlePretty bundle)
+      Right ast   -> putStrLn (pretty ast)
     ParseLALR -> naoImplementado "--parse-lalr"
 
 -- | Executa o analisador lexico com a camada de indentacao, abortando

@@ -24,6 +24,7 @@ library
                     , MiniPython.Frontend.Parser.Expr
                     , MiniPython.Frontend.Parser.RecursiveDescent
                     , MiniPython.Frontend.Parser.Stream
+                    , MiniPython.Frontend.Parser.PEG
     build-depends:    base ^>=4.18.2.1
                     , pretty >=1.1 && <2
                     , megaparsec >=9.5 && <10
@@ -36,6 +37,7 @@ executable mpyc
     main-is:          Main.hs
     build-depends:    base ^>=4.18.2.1
                     , minipython
+                    , megaparsec >=9.5 && <10
     hs-source-dirs:   app
     default-language: Haskell2010
 

@@ -18,7 +18,10 @@ library
                     , MiniPython.Frontend.Lexer.MiniPythonLexer
                     , MiniPython.Frontend.Lexer.Indent
                     , MiniPython.Frontend.Syntax.MiniPythonSyntax
+                    , MiniPython.Frontend.Pretty.MiniPythonPretty
+                    , MiniPython.Utils.Pretty
     build-depends:    base ^>=4.18.2.1
+                    , pretty >=1.1 && <2
     hs-source-dirs:   src
     default-language: Haskell2010
 

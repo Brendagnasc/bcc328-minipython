@@ -5,6 +5,7 @@ import MiniPython.Frontend.Lexer.Indent (layout)
 import MiniPython.Frontend.Lexer.MiniPythonLexer (formatLexError, renderToken, scan)
 import MiniPython.Frontend.Lexer.Token (Token)
 import MiniPython.Frontend.Parser.Core (formatParseError)
+import MiniPython.Frontend.Parser.Happy.Grammar (parseProgramLALR)
 import MiniPython.Frontend.Parser.PEG (formatPegError, parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
 import MiniPython.Frontend.Pretty.MiniPythonPretty (pretty)
@@ -36,7 +37,9 @@ run mode file src = do
     ParsePEG -> case parseProgramPEG file toks of
       Left bundle -> abort (formatPegError file bundle)
       Right ast   -> putStrLn (pretty ast)
-    ParseLALR -> naoImplementado "--parse-lalr"
+    ParseLALR -> case parseProgramLALR toks of
+      Left msg  -> abort (file ++ ":" ++ msg)
+      Right ast -> putStrLn (pretty ast)
 
 -- | Executa o analisador lexico com a camada de indentacao, abortando
 -- com mensagem posicionada em caso de erro.
@@ -44,10 +47,6 @@ tokenize :: FilePath -> String -> IO [Token]
 tokenize file src = case scan src >>= layout of
   Left err   -> abort (formatLexError file err)
   Right toks -> pure toks
-
-naoImplementado :: String -> IO ()
-naoImplementado flag =
-  abort ("a opcao " ++ flag ++ " ainda nao foi implementada")
 
 abort :: String -> IO a
 abort msg = hPutStrLn stderr msg >> exitFailure

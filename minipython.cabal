@@ -23,6 +23,7 @@ library
                     , MiniPython.Frontend.Parser.Core
                     , MiniPython.Frontend.Parser.Expr
                     , MiniPython.Frontend.Parser.RecursiveDescent
+                    , MiniPython.Frontend.Parser.Stream
     build-depends:    base ^>=4.18.2.1
                     , pretty >=1.1 && <2
                     , megaparsec >=9.5 && <10

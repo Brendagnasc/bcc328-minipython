@@ -37,14 +37,17 @@ data Lexeme
   | TLParen | TRParen | TLBracket | TRBracket
   | TComma | TColon | TDot | TArrow
   | TNewline | TIndent | TDedent | TEOF
-  deriving (Eq)
+  -- Ord nao tem significado semantico: e exigido pelo Megaparsec,
+  -- que mantem o conjunto de tokens esperados numa estrutura
+  -- ordenada ao construir mensagens de erro.
+  deriving (Eq, Ord)
 
 -- | Um token e sua classe acompanhada da posicao onde ele comeca.
 data Token = Token
   { tokLexeme :: Lexeme
   , tokPos    :: Pos
   }
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 -- | Nome legivel da classe de um token, usado nas mensagens de erro
 -- e na saida da opcao --lex.

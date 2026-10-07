@@ -4,6 +4,11 @@
 -- DEDENT conforme a secao 4.5 da especificacao. O nivel de indentacao
 -- de uma linha e a coluna do seu primeiro token, informacao que o
 -- scanner ja preservou.
+--
+-- Nao geram INDENT nem DEDENT (item 4 da secao 4.5):
+--   * linhas em branco e linhas contendo apenas comentario, que chegam
+--     aqui como um NEWLINE isolado porque o scanner descarta comentarios;
+--   * linhas continuadas dentro de parenteses ou colchetes abertos.
 module MiniPython.Frontend.Lexer.Indent
   ( layout
   ) where
@@ -15,40 +20,56 @@ import MiniPython.Frontend.Lexer.Token
 layout :: [Token] -> Either LexError [Token]
 layout = startLine [0]
 
--- | Estado no inicio de uma linha logica: decide INDENT ou DEDENT
--- comparando a coluna do primeiro token com o topo da pilha.
+-- | Inicio de uma linha logica: compara a coluna do primeiro token com
+-- o topo da pilha para decidir INDENT, DEDENT ou nada.
 startLine :: [Int] -> [Token] -> Either LexError [Token]
 startLine stack toks = case toks of
   [] -> Right []
-  (t : _)
-    | tokLexeme t == TEOF ->
-        -- Fim do arquivo: fecha todos os blocos abertos antes do EOF.
-        Right (map (const (Token TDedent (tokPos t))) (closing stack) ++ toks)
+
+  -- Fim do arquivo: fecha todos os blocos abertos antes do EOF.
+  (t : _) | tokLexeme t == TEOF ->
+    Right (replicate (length stack - 1) (Token TDedent (tokPos t)) ++ toks)
+
+  -- Linha em branco ou so com comentario: nao afeta a pilha e o
+  -- NEWLINE e descartado para nao poluir a saida.
+  (t : rest) | tokLexeme t == TNewline -> startLine stack rest
+
   (t : _) ->
     let level = posCol (tokPos t) - 1
         top   = head stack
-    in if level > top
-         then (Token TIndent (tokPos t) :) <$> inLine (level : stack) toks
-         else if level == top
-                then inLine stack toks
-                else case popTo level stack of
-                       Nothing -> Left (LexError (tokPos t) "indentacao inconsistente")
-                       Just (n, stack') ->
-                         (replicate n (Token TDedent (tokPos t)) ++)
-                           <$> inLine stack' toks
+    in case compare level top of
+         GT -> (Token TIndent (tokPos t) :) <$> inLine 0 (level : stack) toks
+         EQ -> inLine 0 stack toks
+         LT -> case popTo level stack of
+                 Nothing -> Left (LexError (tokPos t) (inconsistente level stack))
+                 Just (n, stack') ->
+                   (replicate n (Token TDedent (tokPos t)) ++)
+                     <$> inLine 0 stack' toks
 
--- | Estado no meio de uma linha: copia tokens ate o NEWLINE e volta
--- para startLine.
-inLine :: [Int] -> [Token] -> Either LexError [Token]
-inLine stack toks = case toks of
+-- | Meio de uma linha. O primeiro argumento conta parenteses e colchetes
+-- abertos: enquanto for maior que zero a linha logica continua, e as
+-- quebras de linha sao descartadas.
+inLine :: Int -> [Int] -> [Token] -> Either LexError [Token]
+inLine depth stack toks = case toks of
   [] -> Right []
-  (t : rest)
-    | tokLexeme t == TNewline -> (t :) <$> startLine stack rest
-    | otherwise               -> (t :) <$> inLine stack rest
+  (t : rest) -> case tokLexeme t of
+    TNewline
+      | depth > 0 -> inLine depth stack rest
+      | otherwise -> (t :) <$> startLine stack rest
+    TLParen   -> keep (depth + 1)
+    TLBracket -> keep (depth + 1)
+    TRParen   -> keep (max 0 (depth - 1))
+    TRBracket -> keep (max 0 (depth - 1))
+    _         -> keep depth
+    where
+      keep d = (t :) <$> inLine d stack rest
 
--- | Niveis a fechar no fim do arquivo (todos menos o 0 inicial).
-closing :: [Int] -> [Int]
-closing = filter (/= 0)
+-- | Mensagem de erro que mostra o nivel encontrado e os niveis validos.
+inconsistente :: Int -> [Int] -> String
+inconsistente level stack =
+  "indentacao inconsistente: nivel " ++ show level
+    ++ " nao corresponde a nenhum nivel aberto "
+    ++ show (reverse stack)
 
 -- | Desempilha ate encontrar o nivel dado, devolvendo quantos DEDENT
 -- emitir e a pilha resultante. Nothing quando o nivel nao existe na

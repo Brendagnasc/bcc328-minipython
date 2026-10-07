@@ -13,6 +13,7 @@
 module MiniPython.Frontend.Parser.PEG
   ( parseProgramPEG
   , pegErrorPos
+  , formatPegError
   ) where
 
 import Control.Monad (void)
@@ -37,6 +38,21 @@ pegErrorPos bundle = posFromSourcePos (pstateSourcePos estado)
   where
     erro = NE.head (bundleErrors bundle)
     (_, estado) = reachOffset (errorOffset erro) (bundlePosState bundle)
+
+-- | Formata o erro do PEG no mesmo padrao dos demais analisadores.
+-- O Megaparsec relata a falha na maior posicao alcancada entre todas
+-- as alternativas tentadas, que e a posicao mais a direita exigida
+-- pela secao 4 do enunciado.
+formatPegError :: FilePath -> ParseErrorBundle TokenStream Void -> String
+formatPegError file bundle =
+  file
+    ++ ":" ++ show (L.posLine p)
+    ++ ":" ++ show (L.posCol p)
+    ++ ": erro sintatico: " ++ detalhe
+  where
+    p = pegErrorPos bundle
+    erro = NE.head (bundleErrors bundle)
+    detalhe = unwords (lines (parseErrorTextPretty erro))
 
 -- Consome o token EOF produzido pelo lexer e entao o fim do fluxo.
 eof' :: PegParser ()

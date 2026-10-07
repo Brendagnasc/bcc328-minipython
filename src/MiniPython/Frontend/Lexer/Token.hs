@@ -27,8 +27,8 @@ data Lexeme
   | TBoolLit   Bool
   | TIdent String
   | TAnd | TBreak | TBool | TClass | TContinue | TDef | TElif | TElse
-  | TFalse | TFloat | TFor | TIf | TIn | TInt | TLambda | TNone
-  | TNot | TOr | TPass | TReturn | TSelf | TStr | TTrue | TWhile
+  | TFloat | TFor | TIf | TIn | TInt | TLambda | TNone
+  | TNot | TOr | TPass | TReturn | TSelf | TStr | TWhile
   | TPlus | TMinus | TStar | TSlash | TDoubleSlash | TPercent | TDoubleStar
   | TEq | TNeq | TLt | TLe | TGt | TGe
   | TAssign
@@ -63,7 +63,6 @@ describeLexeme l = case l of
   TDef      -> "KW_DEF"
   TElif     -> "KW_ELIF"
   TElse     -> "KW_ELSE"
-  TFalse    -> "KW_FALSE"
   TFloat    -> "KW_FLOAT"
   TFor      -> "KW_FOR"
   TIf       -> "KW_IF"
@@ -77,7 +76,6 @@ describeLexeme l = case l of
   TReturn   -> "KW_RETURN"
   TSelf     -> "KW_SELF"
   TStr      -> "KW_STR"
-  TTrue     -> "KW_TRUE"
   TWhile    -> "KW_WHILE"
   TPlus        -> "PLUS"
   TMinus       -> "MINUS"

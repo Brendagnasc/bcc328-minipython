@@ -1,6 +1,7 @@
 module Main (main) where
 
 import MiniPython.CLI (Mode (..), Options (..), parseArgs, usage)
+import MiniPython.Frontend.Lexer.MiniPythonLexer (formatLexError, renderToken, scan)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -18,10 +19,9 @@ main = do
       src <- readFile file
       run mode file src
 
--- | Despacha para a fase correspondente. Cada ramo sera preenchido
--- nas proximas etapas do trabalho.
 run :: Mode -> FilePath -> String -> IO ()
-run mode file src = do
-  putStrLn ("modo: " ++ show mode)
-  putStrLn ("arquivo: " ++ file)
-  putStrLn ("linhas: " ++ show (length (lines src)))
+run mode file src = case mode of
+  Lex -> case scan src of
+    Left err   -> hPutStrLn stderr (formatLexError file err) >> exitFailure
+    Right toks -> mapM_ (putStrLn . renderToken) toks
+  _ -> putStrLn ("modo " ++ show mode ++ " ainda nao implementado")

@@ -21,6 +21,7 @@ library
                     , MiniPython.Frontend.Pretty.MiniPythonPretty
                     , MiniPython.Utils.Pretty
                     , MiniPython.Frontend.Parser.Core
+                    , MiniPython.Frontend.Parser.Expr
     build-depends:    base ^>=4.18.2.1
                     , pretty >=1.1 && <2
     hs-source-dirs:   src

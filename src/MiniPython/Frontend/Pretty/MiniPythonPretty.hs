@@ -48,9 +48,9 @@ instance Pretty ClassDef where
     (text "class" <+> text (clsName cd) <> super <> colon)
     $$ nest indentWidth body
     where
-      super = case clsSuper of
-        _ | Just s <- clsSuper cd -> parens (text s)
-          | otherwise             -> empty
+      super = case clsSuper cd of
+        Just s  -> parens (text s)
+        Nothing -> empty
       body
         | null (clsFields cd) && null (clsMethods cd) = text "pass"
         | otherwise =

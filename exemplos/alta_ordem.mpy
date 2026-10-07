@@ -1,0 +1,27 @@
+def dobro(x: int) -> int:
+    return x * 2
+
+def positivo(x: int) -> bool:
+    return x > 0
+
+def map(f: (int) -> int, xs: list[int]) -> list[int]:
+    resultado: list[int] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def filter(p: (int) -> bool, xs: list[int]) -> list[int]:
+    resultado: list[int] = []
+    for x in xs:
+        if p(x):
+            append(resultado, x)
+    return resultado
+
+def main() -> None:
+    xs: list[int] = [-3, -1, 0, 2, 4, 7]
+    dobrados: list[int] = map(dobro, xs)
+    positivos: list[int] = filter(positivo, dobrados)
+    for x in positivos:
+        print(str(x))
+
+main()

@@ -290,7 +290,9 @@ toLValue e = case e of
   EVar p n      -> pure (LVar p n)
   EIndex p b i  -> pure (LIndex p b i)
   EField p b n  -> pure (LField p b n)
-  _ -> failWith "um alvo de atribuicao valido" "atribuicao"
+  -- O erro e reportado na posicao da expressao recusada, e nao na do
+  -- proximo token, porque e ela que nao constitui alvo valido.
+  _ -> failAt (exprPos e) "esta expressao" "um alvo de atribuicao valido" "atribuicao"
 
 augOps :: [(Lexeme, AugOp)]
 augOps =

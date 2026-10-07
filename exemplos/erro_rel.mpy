@@ -1,0 +1,2 @@
+x: int = 1
+ok: bool = 1 < x < 10

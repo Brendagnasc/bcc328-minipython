@@ -18,6 +18,7 @@ module MiniPython.Frontend.Parser.Core
   , check
   , accept
   , failWith
+  , failAt
   , many0
   , sepBy1
   ) where
@@ -136,6 +137,10 @@ accept lx = Parser $ \ts -> case ts of
 -- | Falha na posicao do proximo token.
 failWith :: String -> String -> Parser a
 failWith desc ctx = Parser $ \ts -> Left (unexpectedAt ts desc ctx)
+
+-- | Falha numa posicao conhecida, independente do proximo token.
+failAt :: Pos -> String -> String -> String -> Parser a
+failAt p found desc ctx = Parser $ \_ -> Left (ParseError p found desc ctx)
 
 unexpectedAt :: [Token] -> String -> String -> ParseError
 unexpectedAt ts desc ctx = case ts of

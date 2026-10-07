@@ -21,7 +21,10 @@ indentWidth :: Int
 indentWidth = 4
 
 instance Pretty Program where
-  ppr (Program ds) = vcat (map ppr ds)
+  -- Declaracoes de nivel superior sao separadas por uma linha em
+  -- branco. A AST nao guarda formatacao do fonte original; a
+  -- separacao e escolha da impressao, para legibilidade.
+  ppr (Program ds) = foldr (\d acc -> d $+$ acc) empty (map ppr ds)
 
 instance Pretty Decl where
   ppr (DFun fd)   = ppr fd

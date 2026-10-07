@@ -141,6 +141,14 @@ pAtom = do
     TNone        -> advance >> pure (ENone p)
     TSelf        -> advance >> pure (ESelf p)
     TIdent n     -> advance >> pure (EVar p n)
+    -- int, float, str e bool sao palavras reservadas de tipo e tambem
+    -- funcoes primitivas de conversao (secao 8 da especificacao). Em
+    -- posicao de expressao valem como nome de funcao; a chamada e
+    -- montada pelo nivel posfixo.
+    TInt         -> advance >> pure (EVar p "int")
+    TFloat       -> advance >> pure (EVar p "float")
+    TStr         -> advance >> pure (EVar p "str")
+    TBool        -> advance >> pure (EVar p "bool")
     TLBracket    -> do
       _ <- advance
       es <- pArgsUntil TRBracket

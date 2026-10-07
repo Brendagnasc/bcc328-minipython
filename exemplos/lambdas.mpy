@@ -1,0 +1,25 @@
+def map(f: (a) -> b, xs: list[a]) -> list[b]:
+    resultado: list[b] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def filter(p: (a) -> bool, xs: list[a]) -> list[a]:
+    resultado: list[a] = []
+    for x in xs:
+        if p(x):
+            append(resultado, x)
+    return resultado
+
+def compose(f: (b) -> c, g: (a) -> b) -> (a) -> c:
+    return lambda x: f(g(x))
+
+def multiplica_por(n: int) -> (int) -> int:
+    return lambda x: x * n
+
+nums: list[int] = [1, 2, 3, 4, 5]
+pares: list[int] = filter(lambda x: x % 2 == 0, nums)
+dobrar: (int) -> int = multiplica_por(2)
+
+for x in pares:
+    print(str(dobrar(x)))

@@ -1,6 +1,7 @@
 module Main (main) where
 
 import MiniPython.CLI (Mode (..), Options (..), parseArgs, usage)
+import MiniPython.Frontend.Lexer.Indent (layout)
 import MiniPython.Frontend.Lexer.MiniPythonLexer (formatLexError, renderToken, scan)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -21,7 +22,7 @@ main = do
 
 run :: Mode -> FilePath -> String -> IO ()
 run mode file src = case mode of
-  Lex -> case scan src of
+  Lex -> case scan src >>= layout of
     Left err   -> hPutStrLn stderr (formatLexError file err) >> exitFailure
     Right toks -> mapM_ (putStrLn . renderToken) toks
   _ -> putStrLn ("modo " ++ show mode ++ " ainda nao implementado")

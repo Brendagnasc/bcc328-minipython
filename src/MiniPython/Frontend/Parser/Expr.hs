@@ -21,27 +21,27 @@ import MiniPython.Frontend.Syntax.MiniPythonSyntax
 pExpr :: Parser Expr
 pExpr = do
   e <- pOr
-  m <- accept TIf
+  m <- accept TkIf
   case m of
     Nothing -> pure e
     Just _ -> do
       cond <- pOr
-      _ <- expect TElse "else" "expressao condicional"
+      _ <- expect TkElse "else" "expressao condicional"
       alt <- pExpr
       pure (ECond (exprPos e) e cond alt)
 
 -- | ExprOu ::= ExprE { 'or' ExprE }
 pOr :: Parser Expr
-pOr = chainLeft pAnd [(TOr, Or)]
+pOr = chainLeft pAnd [(TkOr, Or)]
 
 -- | ExprE ::= ExprNao { 'and' ExprNao }
 pAnd :: Parser Expr
-pAnd = chainLeft pNot [(TAnd, And)]
+pAnd = chainLeft pNot [(TkAnd, And)]
 
 -- | ExprNao ::= 'not' ExprNao | ExprRel
 pNot :: Parser Expr
 pNot = do
-  m <- accept TNot
+  m <- accept TkNot
   case m of
     Just t  -> EUn (tokPos t) Not <$> pNot
     Nothing -> pRel
@@ -63,7 +63,7 @@ pRel = do
 
 -- | ExprAdit ::= ExprMult { ( '+' | '-' ) ExprMult }
 pAdd :: Parser Expr
-pAdd = chainLeft pMul [(TPlus, Add), (TMinus, Sub)]
+pAdd = chainLeft pMul [(TkPlus, Add), (TkMinus, Sub)]
 
 -- | ExprMult ::= ExprUnaria { ( '*' | '/' | '//' | '%' ) ExprUnaria }
 pMul :: Parser Expr
@@ -75,7 +75,7 @@ pMul = chainLeft pUnary mulOps
 -- portanto -2 ** 2 e lido como (-2) ** 2.
 pUnary :: Parser Expr
 pUnary = do
-  m <- accept TMinus
+  m <- accept TkMinus
   case m of
     Just t  -> EUn (tokPos t) Neg <$> pUnary
     Nothing -> pPow
@@ -86,7 +86,7 @@ pUnary = do
 pPow :: Parser Expr
 pPow = do
   base <- pPostfix
-  m <- accept TDoubleStar
+  m <- accept TkDStar
   case m of
     Nothing -> pure base
     Just _  -> EBin (exprPos base) Pow base <$> pPow
@@ -102,17 +102,17 @@ pPostfix = pAtom >>= go
     go acc = do
       t <- peek
       case tokLexeme t of
-        TLParen -> do
+        TkLParen -> do
           _ <- advance
-          args <- pArgsUntil TRParen
-          _ <- expect TRParen ")" "chamada de funcao"
+          args <- pArgsUntil TkRParen
+          _ <- expect TkRParen ")" "chamada de funcao"
           go (ECall (exprPos acc) acc args)
-        TLBracket -> do
+        TkLBracket -> do
           _ <- advance
           idx <- pExpr
-          _ <- expect TRBracket "]" "acesso indexado"
+          _ <- expect TkRBracket "]" "acesso indexado"
           go (EIndex (exprPos acc) acc idx)
-        TDot -> do
+        TkDot -> do
           _ <- advance
           (_, n) <- expectIdent "acesso a campo"
           go (EField (exprPos acc) acc n)
@@ -120,7 +120,7 @@ pPostfix = pAtom >>= go
 
 -- | Args ::= Expr { ',' Expr }
 pArgs :: Parser [Expr]
-pArgs = sepBy1 TComma pExpr
+pArgs = sepBy1 TkComma pExpr
 
 -- | Lista de argumentos possivelmente vazia, terminada pelo lexema dado.
 pArgsUntil :: Lexeme -> Parser [Expr]
@@ -134,35 +134,35 @@ pAtom = do
   t <- peek
   let p = tokPos t
   case tokLexeme t of
-    TIntLit n    -> advance >> pure (EInt p n)
-    TFloatLit d  -> advance >> pure (EFloat p d)
-    TStringLit s -> advance >> pure (EStr p s)
-    TBoolLit b   -> advance >> pure (EBool p b)
-    TNone        -> advance >> pure (ENone p)
-    TSelf        -> advance >> pure (ESelf p)
-    TIdent n     -> advance >> pure (EVar p n)
+    TkIntLit n    -> advance >> pure (EInt p n)
+    TkFloatLit d  -> advance >> pure (EFloat p d)
+    TkStrLit s -> advance >> pure (EStr p s)
+    TkBoolLit b   -> advance >> pure (EBool p b)
+    TkNoneKw        -> advance >> pure (ENone p)
+    TkSelf        -> advance >> pure (ESelf p)
+    TkIdent n     -> advance >> pure (EVar p n)
     -- int, float, str e bool sao palavras reservadas de tipo e tambem
     -- funcoes primitivas de conversao (secao 8 da especificacao). Em
     -- posicao de expressao valem como nome de funcao; a chamada e
     -- montada pelo nivel posfixo.
-    TInt         -> advance >> pure (EVar p "int")
-    TFloat       -> advance >> pure (EVar p "float")
-    TStr         -> advance >> pure (EVar p "str")
-    TBool        -> advance >> pure (EVar p "bool")
-    TLBracket    -> do
+    TkIntKw         -> advance >> pure (EVar p "int")
+    TkFloatKw       -> advance >> pure (EVar p "float")
+    TkStrKw         -> advance >> pure (EVar p "str")
+    TkBoolKw        -> advance >> pure (EVar p "bool")
+    TkLBracket    -> do
       _ <- advance
-      es <- pArgsUntil TRBracket
-      _ <- expect TRBracket "]" "literal de lista"
+      es <- pArgsUntil TkRBracket
+      _ <- expect TkRBracket "]" "literal de lista"
       pure (EList p es)
-    TLambda -> do
+    TkLambda -> do
       _ <- advance
       ps <- pLambdaParams
-      _ <- expect TColon ":" "expressao lambda"
+      _ <- expect TkColon ":" "expressao lambda"
       ELambda p ps <$> pExpr
-    TLParen -> do
+    TkLParen -> do
       _ <- advance
       e <- pExpr
-      _ <- expect TRParen ")" "expressao entre parenteses"
+      _ <- expect TkRParen ")" "expressao entre parenteses"
       pure e
     _ -> failWith "uma expressao" "expressao"
 
@@ -170,10 +170,10 @@ pAtom = do
 -- nenhum, como em @lambda: 42@ (secao 6.11 da especificacao).
 pLambdaParams :: Parser [Name]
 pLambdaParams = do
-  semParams <- check TColon
+  semParams <- check TkColon
   if semParams
     then pure []
-    else map snd <$> sepBy1 TComma (expectIdent "parametro de lambda")
+    else map snd <$> sepBy1 TkComma (expectIdent "parametro de lambda")
 
 -- | Reconhece uma cadeia associativa a esquerda: proximo { op proximo }.
 chainLeft :: Parser Expr -> [(Lexeme, BinOp)] -> Parser Expr
@@ -197,12 +197,12 @@ peekOp table = do
 
 relOps :: [(Lexeme, BinOp)]
 relOps =
-  [ (TEq, Eq), (TNeq, Neq), (TLt, Lt)
-  , (TLe, Le), (TGt, Gt), (TGe, Ge)
+  [ (TkEqEq, Eq), (TkNeq, Neq), (TkLt, Lt)
+  , (TkLe, Le), (TkGt, Gt), (TkGe, Ge)
   ]
 
 mulOps :: [(Lexeme, BinOp)]
 mulOps =
-  [ (TStar, Mul), (TSlash, Div)
-  , (TDoubleSlash, FloorDiv), (TPercent, Mod)
+  [ (TkStar, Mul), (TkSlash, Div)
+  , (TkDSlash, FloorDiv), (TkPercent, Mod)
   ]

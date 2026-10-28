@@ -5,6 +5,7 @@ module MiniPython.Frontend.Lexer.Token
   , Token (..)
   , initialPos
   , describeLexeme
+  , expectedLexeme
   ) where
 
 -- | Posicao de um caractere no arquivo fonte.
@@ -20,27 +21,29 @@ initialPos :: Pos
 initialPos = Pos 1 1
 
 -- | Classe de um token, sem informacao de posicao.
+--
+-- Os nomes dos construtores sao os da tabela da secao 2.2 do
+-- enunciado, porque a saida de --lex e o proprio show do lexema.
+-- O Ord nao tem significado semantico: e exigido pelo Megaparsec, que
+-- guarda os tokens esperados numa estrutura ordenada.
 data Lexeme
-  = TIntLit    Integer
-  | TFloatLit  Double
-  | TStringLit String
-  | TBoolLit   Bool
-  | TIdent String
-  | TAnd | TBreak | TBool | TClass | TContinue | TDef | TElif | TElse
-  | TFloat | TFor | TIf | TIn | TInt | TLambda | TNone
-  | TNot | TOr | TPass | TReturn | TSelf | TStr | TWhile
-  | TPlus | TMinus | TStar | TSlash | TDoubleSlash | TPercent | TDoubleStar
-  | TEq | TNeq | TLt | TLe | TGt | TGe
-  | TAssign
-  | TPlusAssign | TMinusAssign | TStarAssign
-  | TSlashAssign | TDoubleSlashAssign | TPercentAssign
-  | TLParen | TRParen | TLBracket | TRBracket
-  | TComma | TColon | TDot | TArrow
-  | TNewline | TIndent | TDedent | TEOF
-  -- Ord nao tem significado semantico: e exigido pelo Megaparsec,
-  -- que mantem o conjunto de tokens esperados numa estrutura
-  -- ordenada ao construir mensagens de erro.
-  deriving (Eq, Ord)
+  = TkIntLit   Integer
+  | TkFloatLit Double
+  | TkStrLit   String
+  | TkBoolLit  Bool
+  | TkIdent    String
+  | TkAnd | TkBreak | TkBoolKw | TkClass | TkContinue | TkDef | TkElif
+  | TkElse | TkFloatKw | TkFor | TkIf | TkIn | TkIntKw | TkLambda
+  | TkNoneKw | TkNot | TkOr | TkPass | TkReturn | TkSelf | TkStrKw | TkWhile
+  | TkIndent | TkDedent | TkNewline
+  | TkPlus | TkMinus | TkStar | TkSlash | TkDSlash | TkPercent | TkDStar
+  | TkEqEq | TkNeq | TkLt | TkLe | TkGt | TkGe
+  | TkAssign
+  | TkPlusEq | TkMinusEq | TkStarEq | TkSlashEq | TkDSlashEq | TkPercentEq
+  | TkLParen | TkRParen | TkLBracket | TkRBracket
+  | TkComma | TkColon | TkDot | TkArrow
+  | TkEOF
+  deriving (Eq, Ord, Show)
 
 -- | Um token e sua classe acompanhada da posicao onde ele comeca.
 data Token = Token
@@ -49,66 +52,82 @@ data Token = Token
   }
   deriving (Eq, Ord)
 
--- | Nome legivel da classe de um token, usado nas mensagens de erro
--- e na saida da opcao --lex.
+-- | Texto do lexema como aparece no fonte. Para literais o texto e
+-- reconstruido a partir do valor.
+lexemeText :: Lexeme -> String
+lexemeText l = case l of
+  TkIntLit n   -> show n
+  TkFloatLit d -> show d
+  TkStrLit s   -> show s
+  TkBoolLit b  -> if b then "True" else "False"
+  TkIdent n    -> n
+  TkAnd      -> "and"
+  TkBreak    -> "break"
+  TkBoolKw   -> "bool"
+  TkClass    -> "class"
+  TkContinue -> "continue"
+  TkDef      -> "def"
+  TkElif     -> "elif"
+  TkElse     -> "else"
+  TkFloatKw  -> "float"
+  TkFor      -> "for"
+  TkIf       -> "if"
+  TkIn       -> "in"
+  TkIntKw    -> "int"
+  TkLambda   -> "lambda"
+  TkNoneKw   -> "None"
+  TkNot      -> "not"
+  TkOr       -> "or"
+  TkPass     -> "pass"
+  TkReturn   -> "return"
+  TkSelf     -> "self"
+  TkStrKw    -> "str"
+  TkWhile    -> "while"
+  TkIndent  -> "INDENT"
+  TkDedent  -> "DEDENT"
+  TkNewline -> "NEWLINE"
+  TkPlus    -> "+"
+  TkMinus   -> "-"
+  TkStar    -> "*"
+  TkSlash   -> "/"
+  TkDSlash  -> "//"
+  TkPercent -> "%"
+  TkDStar   -> "**"
+  TkEqEq -> "=="
+  TkNeq  -> "!="
+  TkLt   -> "<"
+  TkLe   -> "<="
+  TkGt   -> ">"
+  TkGe   -> ">="
+  TkAssign    -> "="
+  TkPlusEq    -> "+="
+  TkMinusEq   -> "-="
+  TkStarEq    -> "*="
+  TkSlashEq   -> "/="
+  TkDSlashEq  -> "//="
+  TkPercentEq -> "%="
+  TkLParen   -> "("
+  TkRParen   -> ")"
+  TkLBracket -> "["
+  TkRBracket -> "]"
+  TkComma    -> ","
+  TkColon    -> ":"
+  TkDot      -> "."
+  TkArrow    -> "->"
+  TkEOF -> "EOF"
+
+-- | Como um token encontrado aparece nas mensagens de erro, no padrao
+-- dos arquivos .err: tokens de layout pelo nome, os demais pelo texto
+-- entre aspas simples.
 describeLexeme :: Lexeme -> String
 describeLexeme l = case l of
-  TIntLit _    -> "INT_LIT"
-  TFloatLit _  -> "FLOAT_LIT"
-  TStringLit _ -> "STRING_LIT"
-  TBoolLit _   -> "BOOL_LIT"
-  TIdent _     -> "IDENT"
-  TAnd      -> "KW_AND"
-  TBreak    -> "KW_BREAK"
-  TBool     -> "KW_BOOL"
-  TClass    -> "KW_CLASS"
-  TContinue -> "KW_CONTINUE"
-  TDef      -> "KW_DEF"
-  TElif     -> "KW_ELIF"
-  TElse     -> "KW_ELSE"
-  TFloat    -> "KW_FLOAT"
-  TFor      -> "KW_FOR"
-  TIf       -> "KW_IF"
-  TIn       -> "KW_IN"
-  TInt      -> "KW_INT"
-  TLambda   -> "KW_LAMBDA"
-  TNone     -> "KW_NONE"
-  TNot      -> "KW_NOT"
-  TOr       -> "KW_OR"
-  TPass     -> "KW_PASS"
-  TReturn   -> "KW_RETURN"
-  TSelf     -> "KW_SELF"
-  TStr      -> "KW_STR"
-  TWhile    -> "KW_WHILE"
-  TPlus        -> "PLUS"
-  TMinus       -> "MINUS"
-  TStar        -> "STAR"
-  TSlash       -> "SLASH"
-  TDoubleSlash -> "DSLASH"
-  TPercent     -> "PERCENT"
-  TDoubleStar  -> "DSTAR"
-  TEq  -> "EQ"
-  TNeq -> "NEQ"
-  TLt  -> "LT"
-  TLe  -> "LE"
-  TGt  -> "GT"
-  TGe  -> "GE"
-  TAssign            -> "ASSIGN"
-  TPlusAssign        -> "PLUS_ASSIGN"
-  TMinusAssign       -> "MINUS_ASSIGN"
-  TStarAssign        -> "STAR_ASSIGN"
-  TSlashAssign       -> "SLASH_ASSIGN"
-  TDoubleSlashAssign -> "DSLASH_ASSIGN"
-  TPercentAssign     -> "PERCENT_ASSIGN"
-  TLParen   -> "LPAREN"
-  TRParen   -> "RPAREN"
-  TLBracket -> "LBRACKET"
-  TRBracket -> "RBRACKET"
-  TComma    -> "COMMA"
-  TColon    -> "COLON"
-  TDot      -> "DOT"
-  TArrow    -> "ARROW"
-  TNewline -> "NEWLINE"
-  TIndent  -> "INDENT"
-  TDedent  -> "DEDENT"
-  TEOF     -> "EOF"
+  TkIndent  -> "INDENT"
+  TkDedent  -> "DEDENT"
+  TkNewline -> "NEWLINE"
+  TkEOF     -> "EOF"
+  _         -> "'" ++ lexemeText l ++ "'"
+
+-- | Como um token esperado aparece nas mensagens de erro.
+expectedLexeme :: Lexeme -> String
+expectedLexeme TkIndent = "INDENT (indented block)"
+expectedLexeme l        = describeLexeme l

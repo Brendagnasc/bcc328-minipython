@@ -79,7 +79,7 @@ runFully :: Parser a -> [Token] -> Either ParseError a
 runFully p ts = do
   (a, rest) <- runParser p ts
   case rest of
-    (t : _) | tokLexeme t /= TEOF ->
+    (t : _) | tokLexeme t /= TkEOF ->
       Left (ParseError (tokPos t) (showLexeme (tokLexeme t)) "fim do arquivo" "programa")
     _ -> pure a
 
@@ -118,7 +118,7 @@ expect lx desc ctx = Parser $ \ts -> case ts of
 expectIdent :: String -> Parser (Pos, Name)
 expectIdent ctx = Parser $ \ts -> case ts of
   (t : rest) -> case tokLexeme t of
-    TIdent n -> Right ((tokPos t, n), rest)
+    TkIdent n -> Right ((tokPos t, n), rest)
     other    -> Left (ParseError (tokPos t) (showLexeme other) "um identificador" ctx)
   [] -> Left (ParseError initialPos "fim da entrada" "um identificador" ctx)
 
@@ -171,15 +171,15 @@ sepBy1 sep p = (:) <$> p <*> go
 -- de literais e identificadores.
 showLexeme :: Lexeme -> String
 showLexeme lx = case lx of
-  TIdent n     -> "identificador " ++ show n
-  TIntLit n    -> "literal inteiro " ++ show n
-  TFloatLit d  -> "literal float " ++ show d
-  TStringLit s -> "literal string " ++ show s
-  TBoolLit b   -> if b then "True" else "False"
-  TNewline     -> "fim de linha"
-  TIndent      -> "aumento de indentacao"
-  TDedent      -> "fim de bloco"
-  TEOF         -> "fim do arquivo"
+  TkIdent n     -> "identificador " ++ show n
+  TkIntLit n    -> "literal inteiro " ++ show n
+  TkFloatLit d  -> "literal float " ++ show d
+  TkStrLit s -> "literal string " ++ show s
+  TkBoolLit b   -> if b then "True" else "False"
+  TkNewline     -> "fim de linha"
+  TkIndent      -> "aumento de indentacao"
+  TkDedent      -> "fim de bloco"
+  TkEOF         -> "fim do arquivo"
   other        -> describeLexeme other
 
 -- Reexportado de Syntax para evitar dependencia circular.

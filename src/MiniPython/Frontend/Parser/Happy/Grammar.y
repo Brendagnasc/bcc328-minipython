@@ -28,68 +28,68 @@ import MiniPython.Frontend.Syntax.MiniPythonSyntax
 %monad     { Either String }
 
 %token
-  int_lit   { Token (TIntLit _) _ }
-  float_lit { Token (TFloatLit _) _ }
-  str_lit   { Token (TStringLit _) _ }
-  bool_lit  { Token (TBoolLit _) _ }
-  ident     { Token (TIdent _) _ }
+  int_lit   { Token (TkIntLit _) _ }
+  float_lit { Token (TkFloatLit _) _ }
+  str_lit   { Token (TkStrLit _) _ }
+  bool_lit  { Token (TkBoolLit _) _ }
+  ident     { Token (TkIdent _) _ }
 
-  'and'      { Token TAnd _ }
-  'break'    { Token TBreak _ }
-  'bool'     { Token TBool _ }
-  'class'    { Token TClass _ }
-  'continue' { Token TContinue _ }
-  'def'      { Token TDef _ }
-  'elif'     { Token TElif _ }
-  'else'     { Token TElse _ }
-  'float'    { Token TFloat _ }
-  'for'      { Token TFor _ }
-  'if'       { Token TIf _ }
-  'in'       { Token TIn _ }
-  'int'      { Token TInt _ }
-  'lambda'   { Token TLambda _ }
-  'None'     { Token TNone _ }
-  'not'      { Token TNot _ }
-  'or'       { Token TOr _ }
-  'pass'     { Token TPass _ }
-  'return'   { Token TReturn _ }
-  'self'     { Token TSelf _ }
-  'str'      { Token TStr _ }
-  'while'    { Token TWhile _ }
+  'and'      { Token TkAnd _ }
+  'break'    { Token TkBreak _ }
+  'bool'     { Token TkBoolKw _ }
+  'class'    { Token TkClass _ }
+  'continue' { Token TkContinue _ }
+  'def'      { Token TkDef _ }
+  'elif'     { Token TkElif _ }
+  'else'     { Token TkElse _ }
+  'float'    { Token TkFloatKw _ }
+  'for'      { Token TkFor _ }
+  'if'       { Token TkIf _ }
+  'in'       { Token TkIn _ }
+  'int'      { Token TkIntKw _ }
+  'lambda'   { Token TkLambda _ }
+  'None'     { Token TkNoneKw _ }
+  'not'      { Token TkNot _ }
+  'or'       { Token TkOr _ }
+  'pass'     { Token TkPass _ }
+  'return'   { Token TkReturn _ }
+  'self'     { Token TkSelf _ }
+  'str'      { Token TkStrKw _ }
+  'while'    { Token TkWhile _ }
 
-  '+'   { Token TPlus _ }
-  '-'   { Token TMinus _ }
-  '*'   { Token TStar _ }
-  '/'   { Token TSlash _ }
-  '//'  { Token TDoubleSlash _ }
-  '%'   { Token TPercent _ }
-  '**'  { Token TDoubleStar _ }
-  '=='  { Token TEq _ }
-  '!='  { Token TNeq _ }
-  '<'   { Token TLt _ }
-  '<='  { Token TLe _ }
-  '>'   { Token TGt _ }
-  '>='  { Token TGe _ }
-  '='   { Token TAssign _ }
-  '+='  { Token TPlusAssign _ }
-  '-='  { Token TMinusAssign _ }
-  '*='  { Token TStarAssign _ }
-  '/='  { Token TSlashAssign _ }
-  '//=' { Token TDoubleSlashAssign _ }
-  '%='  { Token TPercentAssign _ }
-  '('   { Token TLParen _ }
-  ')'   { Token TRParen _ }
-  '['   { Token TLBracket _ }
-  ']'   { Token TRBracket _ }
-  ','   { Token TComma _ }
-  ':'   { Token TColon _ }
-  '.'   { Token TDot _ }
-  '->'  { Token TArrow _ }
+  '+'   { Token TkPlus _ }
+  '-'   { Token TkMinus _ }
+  '*'   { Token TkStar _ }
+  '/'   { Token TkSlash _ }
+  '//'  { Token TkDSlash _ }
+  '%'   { Token TkPercent _ }
+  '**'  { Token TkDStar _ }
+  '=='  { Token TkEqEq _ }
+  '!='  { Token TkNeq _ }
+  '<'   { Token TkLt _ }
+  '<='  { Token TkLe _ }
+  '>'   { Token TkGt _ }
+  '>='  { Token TkGe _ }
+  '='   { Token TkAssign _ }
+  '+='  { Token TkPlusEq _ }
+  '-='  { Token TkMinusEq _ }
+  '*='  { Token TkStarEq _ }
+  '/='  { Token TkSlashEq _ }
+  '//=' { Token TkDSlashEq _ }
+  '%='  { Token TkPercentEq _ }
+  '('   { Token TkLParen _ }
+  ')'   { Token TkRParen _ }
+  '['   { Token TkLBracket _ }
+  ']'   { Token TkRBracket _ }
+  ','   { Token TkComma _ }
+  ':'   { Token TkColon _ }
+  '.'   { Token TkDot _ }
+  '->'  { Token TkArrow _ }
 
-  NEWLINE { Token TNewline _ }
-  INDENT  { Token TIndent _ }
-  DEDENT  { Token TDedent _ }
-  EOF     { Token TEOF _ }
+  NEWLINE { Token TkNewline _ }
+  INDENT  { Token TkIndent _ }
+  DEDENT  { Token TkDedent _ }
+  EOF     { Token TkEOF _ }
 
 -- Precedencia da menor para a maior, conforme a secao 6.3 da
 -- especificacao. A diretiva %nonassoc nos operadores relacionais
@@ -300,34 +300,34 @@ parseError (t : _) =
 
 identName :: Token -> Name
 identName t = case tokLexeme t of
-  TIdent n -> n
+  TkIdent n -> n
   _        -> error "identName: token nao e identificador"
 
 mkInt :: Token -> Expr
 mkInt t = case tokLexeme t of
-  TIntLit n -> EInt (tokPos t) n
+  TkIntLit n -> EInt (tokPos t) n
   _         -> error "mkInt"
 
 mkFloat :: Token -> Expr
 mkFloat t = case tokLexeme t of
-  TFloatLit d -> EFloat (tokPos t) d
+  TkFloatLit d -> EFloat (tokPos t) d
   _           -> error "mkFloat"
 
 mkStr :: Token -> Expr
 mkStr t = case tokLexeme t of
-  TStringLit s -> EStr (tokPos t) s
+  TkStrLit s -> EStr (tokPos t) s
   _            -> error "mkStr"
 
 mkBool :: Token -> Expr
 mkBool t = case tokLexeme t of
-  TBoolLit b -> EBool (tokPos t) b
+  TkBoolLit b -> EBool (tokPos t) b
   _          -> error "mkBool"
 
 -- | Identificadores iniciados por maiuscula sao tipos de classe; os
 -- demais sao variaveis de tipo (secao 3.5 da especificacao).
 mkNameType :: Token -> Type
 mkNameType t = case tokLexeme t of
-  TIdent n
+  TkIdent n
     | not (null n) && head n `elem` ['A' .. 'Z'] -> TyClass (tokPos t) n
     | otherwise -> TyVar (tokPos t) n
   _ -> error "mkNameType"

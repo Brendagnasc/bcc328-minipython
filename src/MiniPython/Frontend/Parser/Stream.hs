@@ -85,15 +85,15 @@ instance TraversableStream TokenStream where
 
 showToken :: L.Token -> String
 showToken t = case L.tokLexeme t of
-  L.TIdent n     -> "identificador " ++ show n
-  L.TIntLit n    -> "literal inteiro " ++ show n
-  L.TFloatLit d  -> "literal float " ++ show d
-  L.TStringLit s -> "literal string " ++ show s
-  L.TBoolLit b   -> if b then "True" else "False"
-  L.TNewline     -> "fim de linha"
-  L.TIndent      -> "aumento de indentacao"
-  L.TDedent      -> "fim de bloco"
-  L.TEOF         -> "fim do arquivo"
+  L.TkIdent n     -> "identificador " ++ show n
+  L.TkIntLit n    -> "literal inteiro " ++ show n
+  L.TkFloatLit d  -> "literal float " ++ show d
+  L.TkStrLit s -> "literal string " ++ show s
+  L.TkBoolLit b   -> if b then "True" else "False"
+  L.TkNewline     -> "fim de linha"
+  L.TkIndent      -> "aumento de indentacao"
+  L.TkDedent      -> "fim de bloco"
+  L.TkEOF         -> "fim do arquivo"
   other          -> L.describeLexeme other
 
 -- | Converte a posicao do nosso lexer para a do Megaparsec.

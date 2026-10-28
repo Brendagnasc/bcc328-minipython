@@ -4,10 +4,6 @@
 -- conforme exigido pelo enunciado. A posicao reutiliza o tipo Pos do
 -- analisador lexico, de modo que ha uma unica nocao de posicao em todo
 -- o compilador.
---
--- Os construtores de tipo usam o prefixo Ty para nao colidirem com os
--- lexemas TInt, TFloat, TBool, TStr e TNone, ja que o parser importa
--- os dois modulos ao mesmo tempo.
 module MiniPython.Frontend.Syntax.MiniPythonSyntax
   ( Name
   , Program (..)

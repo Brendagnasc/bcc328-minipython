@@ -24,19 +24,21 @@ delimitam blocos como as chaves de linguagens baseadas em C.
     DefFuncao    ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
 
     Params       ::= Param { ',' Param }
-    Param        ::= IDENT [ ':' Tipo ]
+    Param        ::= 'self' | IDENT [ ':' Tipo ]
 
     DefClasse    ::= 'class' IDENT [ '(' IDENT ')' ] ':' BlocoClasse
 
-    BlocoClasse  ::= NEWLINE INDENT { Campo } { DefFuncao } DEDENT
+    BlocoClasse  ::= NEWLINE INDENT { Campo } { DefFuncao }
+                     [ 'pass' NEWLINE ] DEDENT
 
     Campo        ::= IDENT ':' Tipo NEWLINE
 
     Bloco        ::= NEWLINE INDENT Comando { Comando } DEDENT
 
-Os campos de uma classe precedem os métodos, conforme a seção 6.3 da
-especificação. Uma classe sem campos e sem métodos tem como corpo o
-comando `pass`, reconhecido pela produção `Comando`.
+`self` é palavra reservada (seção 4.2), por isso aparece à parte em
+`Param`. Os campos de uma classe precedem os métodos, conforme a seção
+6.3 da especificação. Uma classe sem campos e sem métodos tem como
+corpo o comando `pass`, que não vai para a AST.
 
 ## Tipos
 
@@ -45,12 +47,14 @@ comando `pass`, reconhecido pela produção `Comando`.
     TipoFuncao   ::= '(' [ Tipo { ',' Tipo } ] ')' '->' Tipo
 
     TipoAtomico  ::= 'int' | 'float' | 'bool' | 'str' | 'None'
-                   | 'list' '[' Tipo ']'
-                   | IDENT
+                   | IDENT [ '[' Tipo ']' ]
 
-O IDENT final é resolvido pelo analisador sintático: identificadores
-iniciados por letra maiúscula são tipos de classe; os demais são
-variáveis de tipo (seção 3.5 da especificação).
+`list` não é palavra reservada, por isso o tipo lista é um IDENT
+seguido do tipo dos elementos entre colchetes. Só `list` aceita esse
+argumento: em `Foo[int]` o erro é apontado no `[`. Sem colchetes, o
+IDENT é resolvido pelo analisador sintático: identificadores iniciados
+por letra maiúscula são tipos de classe; os demais são variáveis de
+tipo (seção 3.5 da especificação).
 
 ## Comandos
 
@@ -113,12 +117,12 @@ gramática não ambígua sem necessidade de declarações externas.
 
     ExprAdit     ::= ExprMult { ( '+' | '-' ) ExprMult }
 
-    ExprMult     ::= ExprUnaria { ( '*' | '/' | '//' | '%' ) ExprUnaria }
+    ExprMult     ::= ExprPot { ( '*' | '/' | '//' | '%' ) ExprPot }
+
+    ExprPot      ::= ExprUnaria [ '**' ExprPot ]
 
     ExprUnaria   ::= '-' ExprUnaria
-                   | ExprPot
-
-    ExprPot      ::= ExprPosfixa [ '**' ExprPot ]
+                   | ExprPosfixa
 
     ExprPosfixa  ::= Atomo { Posfixo }
 
@@ -135,9 +139,13 @@ gramática não ambígua sem necessidade de declarações externas.
                    | 'None'
                    | 'self'
                    | IDENT
+                   | 'int' | 'float' | 'str' | 'bool'
                    | '[' [ Args ] ']'
                    | 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
                    | '(' Expr ')'
+
+Em posição de expressão, `int`, `float`, `str` e `bool` são as funções
+primitivas de conversão (seção 8 da especificação), e não tipos.
 
 ### Precedência resultante
 
@@ -152,8 +160,8 @@ Da menor para a maior:
 | 5 | `==` `!=` `<` `<=` `>` `>=` | não associativo |
 | 6 | `+` `-` | esquerda |
 | 7 | `*` `/` `//` `%` | esquerda |
-| 8 | `-` unário | prefixo |
-| 9 | `**` | direita |
+| 8 | `**` | direita |
+| 9 | `-` unário | prefixo |
 | 10 | `f(...)` `e[i]` `e.campo` | esquerda |
 
 ### Observações sobre as escolhas
@@ -164,9 +172,12 @@ implementação descendente recursiva, e a árvore é construída
 associando à esquerda durante o percurso da repetição.
 
 **Potência e menos unário.** A seção 6.3 da especificação estabelece a
-precedência `- unário > ** > * / // % > + -`. A gramática segue essa
-ordem, de modo que `-2 ** 2` é lido como `(-2) ** 2`. O comportamento
-difere do Python 3, no qual `**` liga mais forte que o menos unário.
+precedência `- unário > ** > * / // % > + -`. Os operandos de `**` são
+`ExprUnaria`, de modo que `-2 ** 2` é lido como `(-2) ** 2` e `2 ** -1`
+é aceito. O comportamento difere do Python 3, no qual `**` liga mais
+forte que o menos unário. Na primeira versão a ordem das duas produções
+estava invertida, e `-2 ** 2` saía como `-(2 ** 2)`, contra a
+especificação.
 
 **Relacionais não associativos.** A produção `ExprRel` admite no
 máximo um operador relacional, portanto `a < b < c` é erro de sintaxe.
@@ -176,7 +187,7 @@ O encadeamento de comparações do Python não faz parte do MiniPython.
 direita no segundo operando, de modo que `2 ** 3 ** 2` é lido como
 `2 ** (3 ** 2)`.
 
-**Lambda como átomo.** A seção 4 do enunciado determina que expressões
+**Lambda como átomo.** A seção 3 do enunciado determina que expressões
 lambda são expressões primárias. O corpo é uma única `Expr`, o que
 permite `lambda x: x if x > 0 else -x` sem ambiguidade, já que a
 expressão condicional é consumida inteira como corpo.
@@ -192,122 +203,176 @@ DEDENT, conforme a seção 3 do enunciado.
 
 ## Gramática PEG
 
-A gramática PEG reconhece exatamente a mesma linguagem da GLC acima
-e produz a mesma AST. A notação segue a convenção usual de PEG:
-`/` denota escolha ordenada, `&` e `!` denotam predicados sintáticos,
-`*` e `?` denotam repetição e opcionalidade.
+A gramática PEG está em `src/MiniPython/Frontend/Parser/PEG.hs`,
+escrita com o quasi-quoter `pegGrammar` da biblioteca typed-peg
+(versão 0.6). Ela reconhece a mesma linguagem da GLC acima e produz a
+mesma AST, posições incluídas. A diferença de organização é que a
+typed-peg lê caracteres, e não tokens: a gramática descreve também a
+parte léxica e a indentação, que na GLC chegam prontas do analisador
+léxico como NEWLINE, INDENT e DEDENT.
 
-A diferença essencial em relação à GLC é a **escolha ordenada**: em
-`A / B`, a alternativa B só é tentada quando A falha. A ordem das
-alternativas passa a ter significado, e a gramática é não ambígua por
-construção, sem necessidade de estratificação adicional. A
-estratificação é mantida mesmo assim, porque é ela que codifica a
-precedência dos operadores.
+Notação: `/` é a escolha ordenada, `&` e `!` são predicados, `*`, `+`
+e `?` são repetição e opcionalidade. As anotações de layout são as da
+typed-peg: `|e|` exige que o primeiro caractere de `e` esteja alinhado
+com o bloco, `e^>` abre um bloco mais à direita que o comando que o
+contém e `e_~` libera a coluna dentro de `e`.
 
-    Programa     <- Decl* EOF
+Para não poluir a leitura, duas coisas ficam implícitas abaixo: todo
+token consome o `Espaco` que vem depois dele, e toda palavra reservada
+é seguida de `![a-zA-Z0-9_]`, para que `iffy` não seja lido como `if`
+seguido de `fy`.
+
+    Programa     <- Brancos (Ind |Decl|)* Fim
 
     Decl         <- DefFuncao / DefClasse / Comando
 
-    DefFuncao    <- 'def' IDENT '(' (Param (',' Param)*)? ')'
-                    ('->' Tipo)? ':' Bloco
+    DefFuncao    <- 'def' Nome '(' (Params ')')_~ ('->' Tipo)? ':' Suite
+    Params       <- Param (',' Param)* / ε
+    Param        <- 'self' / Nome (':' Tipo)?
 
-    Param        <- 'self' / IDENT (':' Tipo)?
+    DefClasse    <- 'class' Nome ('(' Nome ')')? ':' FimLinha Ind Membros^>
+    Membros      <- |Campo| (Ind |Campo|)* (Ind |DefFuncao|)* PassFinal?
+                  / |DefFuncao| (Ind |DefFuncao|)* PassFinal?
+                  / |'pass'| FimLinha
+    PassFinal    <- Ind |'pass'| FimLinha
+    Campo        <- Nome ':' Tipo FimLinha
 
-    DefClasse    <- 'class' IDENT ('(' IDENT ')')? ':'
-                    NEWLINE INDENT &Campo* DefFuncao* ('pass' NEWLINE)? DEDENT
-
-    Campo        <- IDENT ':' Tipo NEWLINE
-
-    Bloco        <- NEWLINE INDENT Comando+ DEDENT
+    Suite        <- FimLinha Ind Bloco
+    Bloco        <- (|Comando| (Ind |Comando|)*)^>
 
     Comando      <- ComandoIf / ComandoWhile / ComandoFor
-                  / ComandoSimples NEWLINE
+                  / ComandoSimples FimLinha
 
-    ComandoIf    <- 'if' Expr ':' Bloco
-                    ('elif' Expr ':' Bloco)*
-                    ('else' ':' Bloco)?
-
-    ComandoWhile <- 'while' Expr ':' Bloco
-
-    ComandoFor   <- 'for' IDENT 'in' Expr ':' Bloco
+    ComandoIf    <- 'if' Expr ':' Suite
+                    (Ind |'elif'| Expr ':' Suite)*
+                    (Ind |'else'| ':' Suite)?
+    ComandoWhile <- 'while' Expr ':' Suite
+    ComandoFor   <- 'for' Nome 'in' Expr ':' Suite
 
     ComandoSimples
-                 <- 'pass' / 'break' / 'continue'
-                  / 'return' Expr?
-                  / &(IDENT ':') DeclVar
-                  / Atribuicao
-
-    DeclVar      <- IDENT ':' Tipo '=' Expr
-
-    Atribuicao   <- Expr (OpAtrib Expr)?
-
-    OpAtrib      <- '=' / '+=' / '-=' / '*=' / '/=' / '//=' / '%='
+                 <- 'pass' / 'break' / 'continue' / 'return' Expr?
+                  / Nome ':' Tipo '=' !'=' Expr
+                  / Expr (OpAtrib Expr)?
+    OpAtrib      <- '=' !'=' / '+=' / '-=' / '*=' / '//=' / '/=' / '%='
 
     Tipo         <- 'int' / 'float' / 'bool' / 'str' / 'None'
-                  / '(' (Tipo (',' Tipo)*)? ')' '->' Tipo
-                  / TipoNome
-
-    TipoNome     <- IDENT ('[' Tipo ']')?
+                  / '(' ((Tipo (',' Tipo)*)? ')')_~ '->' Tipo
+                  / Nome ('[' (Tipo ']')_~)?
 
     Expr         <- ExprOu ('if' ExprOu 'else' Expr)?
     ExprOu       <- ExprE ('or' ExprE)*
     ExprE        <- ExprNao ('and' ExprNao)*
     ExprNao      <- 'not' ExprNao / ExprRel
     ExprRel      <- ExprAdit (OpRel ExprAdit)?
-    ExprAdit     <- ExprMult (('+' / '-') ExprMult)*
-    ExprMult     <- ExprUnaria (('*' / '/' / '//' / '%') ExprUnaria)*
-    ExprUnaria   <- '-' ExprUnaria / ExprPot
-    ExprPot      <- ExprPosfixa ('**' ExprPot)?
+    OpRel        <- '==' / '!=' / '<=' / '>=' / '<' / '>'
+    ExprAdit     <- ExprMult (OpAdit ExprMult)*
+    OpAdit       <- '+' !'=' / '-' ![=>]
+    ExprMult     <- ExprPot (OpMult ExprPot)*
+    OpMult       <- '//' !'=' / '/' !'=' / '%' !'=' / '*' ![*=]
+    ExprPot      <- ExprUnaria ('**' ExprPot)?
+    ExprUnaria   <- '-' ![=>] ExprUnaria / ExprPosfixa
     ExprPosfixa  <- Atomo Posfixo*
+    Posfixo      <- '(' (Args ')')_~ / '[' (Expr ']')_~ / '.' Nome
+    Args         <- Expr (',' Expr)* / ε
 
-    Posfixo      <- '(' (Expr (',' Expr)*)? ')'
-                  / '[' Expr ']'
-                  / '.' IDENT
+    Atomo        <- 'True' / 'False' / 'None' / 'self'
+                  / 'int' / 'float' / 'str' / 'bool'
+                  / Nome / Numero / String
+                  / '[' (Args ']')_~
+                  / 'lambda' (Nome (',' Nome)*)? ':' Expr
+                  / '(' (Expr ')')_~
 
-    Atomo        <- INT_LIT / FLOAT_LIT / STRING_LIT / BOOL_LIT
-                  / 'None' / 'self'
-                  / IDENT / 'int' / 'float' / 'str' / 'bool'
-                  / '[' (Expr (',' Expr)*)? ']'
-                  / 'lambda' (IDENT (',' IDENT)*)? ':' Expr
-                  / '(' Expr ')'
+    EspacoLinha  <- ([ \t\r] / '#' [^\n]*)*
+    Espaco       <- ([ \t\r] / '#' [^\n]* / &('\n' .) '\n')*
+    FimLinha     <- (EspacoLinha ('\n' / !.) Brancos)_~
+    Brancos      <- (EspacoLinha '\n')*_~
+    Ind          <- [ \t]*_~
+    Fim          <- (EspacoLinha !.)_~
 
-### Pontos de retrocesso
+    Nome         <- !Reservada [a-zA-Z_] [a-zA-Z0-9_]*
+    Reservada    <- ('and' / 'break' / 'bool' / 'class' / 'continue' / 'def'
+                    / 'elif' / 'else' / 'False' / 'float' / 'for' / 'if' / 'int'
+                    / 'in' / 'lambda' / 'None' / 'not' / 'or' / 'pass'
+                    / 'return' / 'self' / 'str' / 'True' / 'while') ![a-zA-Z0-9_]
+    Numero       <- [0-9] [0-9_]* ('.' [0-9] [0-9_]*)? ([eE] [+-]? [0-9]+)?
+    String       <- '"' (Escape / [^"\\\n])* '"'
+                  / '\'' (Escape / [^'\\\n])* '\''
+    Escape       <- '\\' [ntr\\"']
 
-A implementação usa Megaparsec, no qual uma alternativa que já
-consumiu tokens não permite que a seguinte seja tentada, a menos que
-seja envolvida em `try`. Dois pontos exigem retrocesso:
+### Indentação
 
-**Declaração de variável versus atribuição.** `DeclVar` e
-`Atribuicao` compartilham o prefixo IDENT e só se distinguem no
-segundo token. A alternativa `DeclVar` é tentada primeiro, com
-`try`, e o retrocesso ocorre quando o token seguinte ao
-identificador não é `:`.
+O exemplo `PEG.Examples.Layout` da disciplina mostra o modelo: um
+bloco é `e^>`, com a coluna maior que a do comando que o abriu, e cada
+comando do bloco é `|e|`, alinhado com o primeiro. O que fecha um bloco
+é a primeira linha cuja coluna não alinha. Indentação inconsistente,
+como voltar para uma coluna que nunca foi aberta, nem chega ao PEG: o
+analisador léxico roda antes em todos os modos e rejeita o programa
+com a mesma mensagem.
 
-**Campo de classe versus método.** No corpo de uma classe, `Campo`
-também começa com IDENT. A repetição de campos usa `try` para que o
-primeiro método não seja consumido parcialmente.
+A relação padrão entre tokens é `gtR`: depois do primeiro token, o
+restante do comando fica estritamente à direita da coluna do comando.
+Por isso `elif` e `else` aparecem alinhados explicitamente, `Ind
+|'elif'|`, e o programa começa na coluna 0.
 
-Nos demais pontos a escolha é decidida pelo primeiro token, sem
-retrocesso.
+### Quebras de linha
+
+Na GLC a quebra de linha é o token NEWLINE, que o analisador léxico
+não emite dentro de parênteses e colchetes. A PEG reproduz isso com o
+`Espaco` entre tokens, que só consome uma quebra de linha se o primeiro
+caractere da linha seguinte for aceito pela relação de coluna em vigor.
+Fora de parênteses vale `gtR`, que nunca aceita a coluna 0, e a quebra
+fica para `FimLinha`; dentro deles vale `_~`, que aceita qualquer
+coluna, e a quebra vira espaço. A mesma regra serve aos dois casos sem
+duplicar a gramática de expressões.
+
+O mesmo cuidado vale para o fim do arquivo: sob `gtR`, `!.` no meio do
+arquivo teria sucesso, porque o primeiro caractere da linha seguinte é
+recusado pela relação de coluna. Por isso `Fim` e `FimLinha` testam o
+fim da entrada com `_~`.
 
 ### Ordem das alternativas
 
-A ordem em `ComandoSimples` e em `Atomo` é significativa. Em
-`Atomo`, as palavras reservadas `int`, `float`, `str` e `bool`
-aparecem após IDENT porque são funções primitivas de conversão
-(seção 8 da especificação) quando ocorrem em posição de expressão.
-Em `Tipo`, as mesmas palavras aparecem antes de `TipoNome`, no papel
-de tipos primitivos.
+A ordem é significativa em alguns pontos:
 
-### Posição mais à direita
+- Em `ComandoSimples`, a declaração `Nome ':' Tipo '=' Expr` vem antes
+  da atribuição. Quando o `:` não aparece, a escolha volta e tenta a
+  atribuição, que começa pelo mesmo `Nome`.
+- Em `Atomo`, as palavras reservadas `int`, `float`, `str` e `bool`
+  valem como nomes de função (seção 8 da especificação); em `Tipo`, as
+  mesmas palavras são os tipos primitivos.
+- Em `Reservada`, `int` precisa vir antes de `in`: a escolha é
+  ordenada e não volta atrás, de modo que com `in` primeiro a entrada
+  `int` falharia no `![a-zA-Z0-9_]` e seria aceita como nome.
+- Nos operadores, os predicados fazem o papel do casamento mais longo
+  do analisador léxico: `+` não pode ser o começo de `+=`, nem `-` o de
+  `->` ou `-=`, nem `*` o de `**`.
 
-O enunciado exige que o analisador PEG reporte a posição mais à
-direita em que o reconhecimento falhou. O Megaparsec implementa esse
-comportamento por construção: entre todas as alternativas tentadas, o
-erro relatado é o de maior deslocamento na entrada, por ser o que
-indica onde o texto efetivamente divergiu da gramática. A função
-`formatPegError` converte esse deslocamento em linha e coluna
-usando as posições registradas nos próprios tokens.
+### Posição mais à direita e mensagens
+
+A typed-peg devolve, quando o reconhecimento falha, a posição mais à
+direita em que alguma regra falhou e a lista do que era esperado ali,
+como pede a seção 4 do enunciado. As diretivas `%label` dão nome às
+regras que aparecem na mensagem (`expression`, `identifier`, `type`,
+`NEWLINE`, `INDENT (indented block)`) e escondem, com nome vazio, o
+espaço e o primeiro token das continuações opcionais (operadores,
+`elif`, `else`, `->`, a vírgula de uma lista). Sem isso, em `if x > 0`
+sem `:`, a lista traria todos os operadores que poderiam continuar a
+expressão; com isso, traz só o `:`. O token encontrado é descrito a
+partir da lista do analisador léxico, para que o texto seja igual ao
+dos outros dois parsers.
+
+As regras de comando devolvem `Either Error`, porque três restrições
+só podem ser verificadas na ação semântica, que não pode fazer o
+reconhecimento falhar: alvo de atribuição, parâmetro repetido e
+argumento de tipo fora de `list`.
+
+Nos testes, a mensagem do PEG é a mesma dos outros parsers em todos os
+casos. Fora deles há duas diferenças conhecidas: uma palavra reservada
+onde se espera um nome (`for if in xs:`) sai como `unexpected 'if'`,
+porque o predicado `!Reservada` não registra o que esperava; e um
+parêntese não fechado na última linha é apontado no `\n` dessa linha,
+enquanto os outros apontam o NEWLINE que o analisador léxico gera no
+fim do arquivo.
 
 ## Adaptação para o Happy e conflitos shift/reduce
 
@@ -317,22 +382,27 @@ estratificadas** na especificação do Happy. Há uma única produção
 são declaradas por diretivas:
 
     %nonassoc LAMBDA
-    %nonassoc 'if' 'else'
+    %right    'if' 'else'
     %left     'or'
     %left     'and'
     %right    'not'
     %nonassoc '==' '!=' '<' '<=' '>' '>='
     %left     '+' '-'
     %left     '*' '/' '//' '%'
-    %right    NEG
     %right    '**'
+    %right    NEG
     %left     '.' '[' '('
 
 A ordem das declarações é da menor para a maior precedência. O
 pseudo-token `NEG` distingue o menos unário do binário, declarado com
-`%prec NEG` na produção correspondente. O `%nonassoc` nos operadores
-relacionais produz o mesmo efeito da produção não recursiva da GLC:
-`a < b < c` é rejeitado.
+`%prec NEG` na produção correspondente, e fica acima de `'**'`, como
+na GLC. O `%nonassoc` nos operadores relacionais produz o mesmo efeito
+da produção não recursiva da GLC: `a < b < c` é rejeitado.
+
+A condicional é `%right` porque o ramo `else` da GLC é uma `Expr`
+completa: `a if b else c if d else e` é `a if b else (c if d else e)`.
+Na primeira versão ela estava como `%nonassoc`, e o LALR recusava essa
+entrada, que os outros dois parsers aceitam.
 
 Como o analisador léxico já insere INDENT e DEDENT, os blocos são
 delimitados por tokens e a produção `Bloco` é tratada exatamente como
@@ -369,3 +439,57 @@ sobrescrever a precedência da produção:
 Com isso qualquer operador tem precedência maior que a produção e o
 deslocamento ocorre. A especificação passou a ser gerada com **zero
 conflitos shift/reduce**.
+
+### Ajustes para concordar com os outros parsers
+
+Duas produções foram reorganizadas para que as verificações aconteçam
+no mesmo ponto do descendente recursivo:
+
+    DefFuncao   : 'def' ident ListaParams Retorno ':' Bloco
+    ListaParams : '(' Params ')'
+
+`ListaParams` é reduzida logo depois do `)`, antes do corpo, e é na
+sua ação que o parâmetro repetido é recusado, com a posição do `)`. O
+corpo de classe ganhou o `pass` opcional (`Passe`), que o descendente
+recursivo já aceitava.
+
+Para o erro sintático o Happy foi configurado com `%errorhandlertype
+explist`, que entrega ao tratador os terminais aceitos no estado do
+erro. Um estado LALR mistura os contextos que compartilham o mesmo
+núcleo, então a lista costuma ser grande; a mensagem usa o terminal
+mais informativo, nesta ordem: `:`, `INDENT`, início de expressão,
+`NEWLINE` e, por fim, o primeiro terminal que não seja operador.
+
+## Regras verificadas fora da gramática
+
+Algumas restrições não são livres de contexto, ou ficam mais claras
+como verificação à parte. Os três parsers produzem a mesma AST e
+aplicam as mesmas regras, com as mesmas mensagens:
+
+| Regra | Onde | Mensagem |
+|---|---|---|
+| `return` fora de função | `Syntax/Validate.hs`, sobre a AST | `'return' outside a function` |
+| `break` e `continue` fora de laço | `Syntax/Validate.hs`, sobre a AST | `'break' outside a loop` |
+| parâmetro repetido | em cada parser, ao fechar a lista | `duplicate parameter: 'a'` |
+| alvo de atribuição | em cada parser, na atribuição | `invalid assignment target` |
+| argumento de tipo fora de `list` | em cada parser, no tipo | `unexpected '[' after type 'Foo'` |
+
+O parâmetro repetido é apontado no `)` que fecha a lista, como no
+arquivo `.err` correspondente, e essa posição não fica na AST; por
+isso a verificação é feita por cada parser, e não em `Validate`.
+
+## Mensagens de erro
+
+Todas as mensagens seguem a seção 2.1 do enunciado,
+`arquivo:linha:coluna: error: mensagem`, em stderr, com o nome do
+arquivo sem o diretório, como nos arquivos `.err`. Os erros léxicos
+usam o texto dos `.err` (`caractere inválido`, `string não terminada`,
+`literal float mal formado`, `nível de indentação inválido`); os
+sintáticos têm a forma `expected X, got Y`, em que Y é o token
+encontrado: `NEWLINE`, `INDENT`, `DEDENT` e `EOF` pelo nome, os demais
+pelo texto entre aspas simples.
+
+O erro de indentação é apontado no NEWLINE da linha anterior, e não no
+primeiro token da linha mal indentada, porque é ao fim daquela linha
+que o analisador léxico compara os níveis. É a mesma posição dos
+DEDENT na saída de `--lex`.

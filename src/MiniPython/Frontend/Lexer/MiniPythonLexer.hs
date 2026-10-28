@@ -79,36 +79,48 @@ lexIdent input =
       Just lx -> lx
       Nothing -> TkIdent name
 
--- | Literais numericos. Depois do ponto decimal precisa vir ao menos
--- um digito: 3. e literal float mal formado. O expoente so faz parte
--- do numero se tiver digitos.
+-- | Literais numericos. Depois do ponto decimal precisa vir ao menos um
+-- digito (3. e mal formado), o expoente precisa de digitos (1e e 1e+
+-- sao mal formados) e o separador _ so vale entre dois digitos (1__2 e
+-- 1_ sao mal formados). O erro e apontado no inicio do numero.
 lexNumber :: String -> Either String (Lexeme, Int)
 lexNumber input = do
   let (intPart, afterInt) = spanDigits input
   (fracPart, afterFrac) <- case afterInt of
     ('.' : d : _) | isDigit d ->
       let (ds, r) = spanDigits (drop 1 afterInt) in Right ('.' : ds, r)
-    ('.' : _) -> Left ("literal float mal formado: '" ++ intPart ++ ".'")
+    ('.' : _) -> malFormado "float" (intPart ++ ".")
     _ -> Right ("", afterInt)
-  let expPart = case afterFrac of
-        (e : r) | e == 'e' || e == 'E' -> readExponent e r
-        _ -> ""
-      text = intPart ++ fracPart ++ expPart
+  expPart <- case afterFrac of
+    (e : r) | e == 'e' || e == 'E' -> readExponent (intPart ++ fracPart) e r
+    _ -> Right ""
+  let text = intPart ++ fracPart ++ expPart
       clean = filter (/= '_') text
-  if null fracPart && null expPart
-    then Right (TkIntLit (read clean), length text)
-    else Right (TkFloatLit (read clean), length text)
+      isFloat = not (null fracPart && null expPart)
+  if not (validSeparators text)
+    then malFormado (if isFloat then "float" else "inteiro") text
+    else if isFloat
+      then Right (TkFloatLit (read clean), length text)
+      else Right (TkIntLit (read clean), length text)
   where
-    readExponent e r = case r of
-      (s : r2) | s == '+' || s == '-' ->
-        let ds = takeWhile isDigit r2
-        in if null ds then "" else e : s : ds
-      _ ->
-        let ds = takeWhile isDigit r
-        in if null ds then "" else e : ds
+    readExponent before e r = case r of
+      (s : r2) | s == '+' || s == '-' -> digitsAfter [e, s] r2
+      _                               -> digitsAfter [e] r
+      where
+        digitsAfter prefix rest = case spanDigits rest of
+          ("", _) -> malFormado "float" (before ++ prefix)
+          (ds, _) -> Right (prefix ++ ds)
+
+    malFormado tipo text =
+      Left ("literal " ++ tipo ++ " mal formado: '" ++ text ++ "'")
 
 spanDigits :: String -> (String, String)
 spanDigits = span (\ch -> isDigit ch || ch == '_')
+
+-- | O separador _ so vale entre dois digitos.
+validSeparators :: String -> Bool
+validSeparators s =
+  and [isDigit a && isDigit b | (a, '_', b) <- zip3 (' ' : s) s (drop 1 s ++ " ")]
 
 -- | Literais de string. O tamanho consumido inclui as duas aspas e conta
 -- cada sequencia de escape como dois caracteres do fonte.

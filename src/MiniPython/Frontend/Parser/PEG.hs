@@ -367,10 +367,12 @@ mkPostfix = foldl step
                             / "in" / "lambda" / "None" / "not" / "or" / "pass" / "return"
                             / "self" / "str" / "True" / "while" ) ![a-zA-Z0-9_]
 
+  # O separador _ so vale entre dois digitos, como no lexer.
   number    :: Expr      <- p:@ i:digits f:fraction? x:exponent? sp  { mkNumber src p i f x }
-  digits    :: String    <- d:[0-9] ds:[0-9_]*         { d : ds }
-  fraction  :: String    <- '.' d:[0-9] ds:[0-9_]*    { '.' : d : ds }
-  exponent  :: String    <- e:[eE] s:sign ds:[0-9]+    { e : s ++ ds }
+  digits    :: String    <- d:[0-9] ds:digitmore*      { d : ds }
+  digitmore :: Char      <- '_'? d:[0-9]
+  fraction  :: String    <- '.' ds:digits              { '.' : ds }
+  exponent  :: String    <- e:[eE] s:sign ds:digits    { e : s ++ ds }
   sign      :: String    <- '+' { "+" } / '-' { "-" } / { "" }
 
   string    :: String    <- '"' cs:dqchar* '"' sp      { cs }

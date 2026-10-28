@@ -58,10 +58,9 @@
 \maketitle
 
 \begin{abstract}
-Este relatório descreve a primeira etapa do compilador MiniPython, em
-Haskell: o analisador léxico e três analisadores sintáticos que produzem
-a mesma árvore sintática abstrata (AST), um descendente recursivo
-(Megaparsec), um baseado em PEG (typed-peg) e um LALR (Happy).
+Primeira etapa do compilador MiniPython, em Haskell: o analisador
+léxico e três analisadores sintáticos, descendente recursivo
+(Megaparsec), PEG (typed-peg) e LALR (Happy), que produzem a mesma AST.
 \end{abstract}
 
 % O sumario foi retirado para caber no limite de 6 paginas.
@@ -70,12 +69,10 @@ a mesma árvore sintática abstrata (AST), um descendente recursivo
 \section{Introdução}
 
 MiniPython é um subconjunto de Python 3 com anotações de tipo, classes
-com herança simples e funções anônimas, em que os blocos são delimitados
-por indentação. Este trabalho implementa as fases de análise léxica e
-sintática, acessíveis pelo executável \texttt{mpyc} com as opções
-\texttt{-{}-lex}, \texttt{-{}-parse-rd}, \texttt{-{}-parse-peg} e
-\texttt{-{}-parse-lalr}. As gramáticas também estão, com mais detalhes,
-em \texttt{docs/gramatica.md}.
+e funções anônimas, com blocos delimitados por indentação. Este
+trabalho implementa a análise léxica e a sintática, acessíveis pelo
+executável \texttt{mpyc}; as gramáticas estão, com mais detalhes, em
+\texttt{docs/gramatica.md}.
 
 \section{Metodologia}
 
@@ -90,7 +87,7 @@ maiúsculas são classes de token e os entre aspas são o próprio lexema;
 
 \begin{lstlisting}[style=gram]
 Programa     ::= { Decl } EOF
-Decl         ::= DefFuncao | DefClasse | Comando
+Decl         ::= DefClasse | Comando
 DefFuncao    ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
 Params       ::= Param { ',' Param }
 Param        ::= 'self' | IDENT [ ':' Tipo ]
@@ -100,7 +97,7 @@ Campo        ::= IDENT ':' Tipo NEWLINE
 Bloco        ::= NEWLINE INDENT Comando { Comando } DEDENT
 Tipo         ::= 'int' | 'float' | 'bool' | 'str' | 'None' | IDENT [ '[' Tipo ']' ]
                | '(' [ Tipo { ',' Tipo } ] ')' '->' Tipo
-Comando      ::= ComandoSimples NEWLINE | ComandoIf | ComandoWhile | ComandoFor
+Comando      ::= ComandoSimples NEWLINE | ComandoIf | ComandoWhile | ComandoFor | DefFuncao
 ComandoSimples ::= 'pass' | 'break' | 'continue' | 'return' [ Expr ] | Expr
                | IDENT ':' Tipo '=' Expr | Alvo ( '=' | OpAumentado ) Expr
 Alvo         ::= IDENT | ExprPosfixa '[' Expr ']' | ExprPosfixa '.' IDENT
@@ -108,7 +105,7 @@ OpAumentado  ::= '+=' | '-=' | '*=' | '/=' | '//=' | '%='
 ComandoIf    ::= 'if' Expr ':' Bloco { 'elif' Expr ':' Bloco } [ 'else' ':' Bloco ]
 ComandoWhile ::= 'while' Expr ':' Bloco
 ComandoFor   ::= 'for' IDENT 'in' Expr ':' Bloco
-Expr         ::= ExprOu [ 'if' ExprOu 'else' Expr ]
+Expr         ::= 'lambda' [ IDENT { ',' IDENT } ] ':' Expr | ExprOu [ 'if' ExprOu 'else' Expr ]
 ExprOu       ::= ExprE { 'or' ExprE }
 ExprE        ::= ExprNao { 'and' ExprNao }
 ExprNao      ::= 'not' ExprNao | ExprRel
@@ -121,7 +118,6 @@ ExprPosfixa  ::= Atomo { '(' [ Args ] ')' | '[' Expr ']' | '.' IDENT }
 Args         ::= Expr { ',' Expr }
 Atomo        ::= INT_LIT | FLOAT_LIT | STRING_LIT | BOOL_LIT | 'None' | 'self' | IDENT
                | 'int' | 'float' | 'str' | 'bool' | '[' [ Args ] ']' | '(' Expr ')'
-               | 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
 \end{lstlisting}
 
 A precedência e a associatividade ficam na própria forma das produções,
@@ -131,18 +127,18 @@ relacionais (não associativos), \texttt{+ -} e \texttt{* / // \%} (à
 esquerda), \texttt{**} (à direita), menos unário e os pós-fixos. As
 repetições \texttt{\{ op B \}} evitam a recursão à esquerda, que
 impediria a implementação descendente~\cite{appel1998}, e
-\texttt{ExprRel} admite um só relacional (\texttt{a < b < c} é erro de
-sintaxe). A seção 6.3 da especificação põe o
-menos unário acima de \texttt{**}; como os operandos de \texttt{**} são
-\texttt{ExprUnaria}, \texttt{-2 ** 2} é \texttt{(-2) ** 2} e
-\texttt{2 ** -1} é aceito, ao contrário de Python. O ramo \texttt{else}
-da condicional e o corpo da lambda são \texttt{Expr} completas, o que
-torna a condicional associativa à direita e deixa
-\texttt{lambda x: x if x > 0 else -x} sem ambiguidade. Por fim,
-\texttt{list} não é palavra reservada: o tipo lista é um \texttt{IDENT}
-seguido de \texttt{[ Tipo ]}, e só \texttt{list} aceita esse argumento;
-sem colchetes, um nome com inicial maiúscula é tipo de classe e os
-demais são variáveis de tipo (seção 3.5).
+\texttt{a < b < c} é erro de sintaxe. Como a seção 6.3 da especificação
+põe o menos unário acima de \texttt{**}, \texttt{-2 ** 2} é
+\texttt{(-2) ** 2}. A lambda fica no nível de \texttt{Expr}, e não
+entre os átomos: como átomo, \texttt{lambda x: x + 1} teria duas
+árvores, com a soma dentro ou fora do corpo; assim o corpo vai até o
+fim da expressão, e como operando a lambda precisa de parênteses. A
+condição e o valor da condicional são \texttt{ExprOu}, então ela
+associa à direita e \texttt{1 if 2 if 3 else 4 else 5} é erro.
+\texttt{DefFuncao} também é comando, porque a regra 19 da seção 10 da
+especificação prevê funções locais, e por isso não se repete em
+\texttt{Decl}. O tipo lista é \texttt{IDENT [ Tipo ]}, aceito só para
+\texttt{list}.
 
 \subsubsection*{Gramática PEG}
 
@@ -171,7 +167,7 @@ Membros      <- |Campo| (Ind |Campo|)* (Ind |DefFuncao|)* PassFinal?
 PassFinal    <- Ind |'pass'| FimLinha
 Campo        <- Nome ':' Tipo FimLinha
 Suite        <- FimLinha Ind (|Comando| (Ind |Comando|)*)^>
-Comando      <- ComandoIf / ComandoWhile / ComandoFor / ComandoSimples FimLinha
+Comando      <- DefFuncao / ComandoIf / ComandoWhile / ComandoFor / ComandoSimples FimLinha
 ComandoIf    <- 'if' Expr ':' Suite (Ind |'elif'| Expr ':' Suite)*
                 (Ind |'else'| ':' Suite)?
 ComandoWhile <- 'while' Expr ':' Suite
@@ -181,7 +177,7 @@ ComandoSimples <- 'pass' / 'break' / 'continue' / 'return' Expr?
 OpAtrib      <- '=' !'=' / '+=' / '-=' / '*=' / '//=' / '/=' / '%='
 Tipo         <- 'int' / 'float' / 'bool' / 'str' / 'None'
               / '(' ((Tipo (',' Tipo)*)? ')')_~ '->' Tipo / Nome ('[' (Tipo ']')_~)?
-Expr         <- ExprOu ('if' ExprOu 'else' Expr)?
+Expr         <- 'lambda' (Nome (',' Nome)*)? ':' Expr / ExprOu ('if' ExprOu 'else' Expr)?
 ExprOu       <- ExprE ('or' ExprE)*
 ExprE        <- ExprNao ('and' ExprNao)*
 ExprNao      <- 'not' ExprNao / ExprRel
@@ -194,7 +190,6 @@ ExprPosfixa  <- Atomo ('(' (Args ')')_~ / '[' (Expr ']')_~ / '.' Nome)*
 Args         <- (Expr (',' Expr)*)?
 Atomo        <- 'True' / 'False' / 'None' / 'self' / 'int' / 'float' / 'str' / 'bool'
               / Nome / Numero / String / '[' (Args ']')_~ / '(' (Expr ')')_~
-              / 'lambda' (Nome (',' Nome)*)? ':' Expr
 EspacoLinha  <- ([ \t\r] / '#' [^\n]*)*
 Espaco       <- ([ \t\r] / '#' [^\n]* / &('\n' .) '\n')*
 FimLinha     <- (EspacoLinha ('\n' / !.) Brancos)_~
@@ -203,7 +198,8 @@ Ind          <- [ \t]*_~
 Fim          <- (EspacoLinha !.)_~
 Nome         <- !Reservada [a-zA-Z_] [a-zA-Z0-9_]*
 Reservada    <- ('and' / 'break' / ... / 'int' / 'in' / ... / 'while') ![a-zA-Z0-9_]
-Numero       <- [0-9] [0-9_]* ('.' [0-9] [0-9_]*)? ([eE] [+-]? [0-9]+)?
+Numero       <- Digitos ('.' Digitos)? ([eE] [+-]? Digitos)?
+Digitos      <- [0-9] ('_'? [0-9])*
 String       <- '"' (Escape / [^"\\\n])* '"' / '\'' (Escape / [^'\\\n])* '\''
 Escape       <- '\\' [ntr\\"']
 \end{lstlisting}
@@ -214,11 +210,10 @@ também as quebras de linha, porque \texttt{Espaco} só consome um
 \texttt{\textbackslash n} se o primeiro caractere da linha seguinte for
 aceito pela relação em vigor: sob \texttt{gtR} a coluna 0 nunca é, e a
 quebra encerra o comando; sob \texttt{\_\textasciitilde}, dentro de
-parênteses e colchetes, ela vira espaço. Na escolha ordenada, a
-declaração vem antes da atribuição, \texttt{'int'} antes de
-\texttt{'in'} e os predicados nos operadores fazem o papel do casamento
-mais longo do analisador léxico (\texttt{+} não pode começar
-\texttt{+=}).
+parênteses e colchetes, ela vira espaço. Na escolha ordenada,
+\texttt{'int'} vem antes de \texttt{'in'}, e os predicados nos
+operadores fazem o papel do casamento mais longo do analisador léxico
+(\texttt{+} não pode começar \texttt{+=}).
 
 %\subsection{Sistema de tipos para MiniPython}
 %\subsection{Inferência de tipos para MiniPython}
@@ -251,8 +246,10 @@ o \texttt{Show} derivado é usado só para tokens, nunca para a AST. O
 \texttt{DEDENT} e o erro de indentação no \texttt{NEWLINE} da linha
 anterior, onde o bloco se fecha, e o \texttt{EOF} sai como
 \texttt{0:0}. Os erros léxicos são caractere inválido, string não
-terminada, float sem dígito depois do ponto, escape inválido e nível de
-indentação fora da pilha.
+terminada, escape inválido, nível de indentação fora da pilha e literal
+numérico mal formado: \texttt{\_} fora de entre dois dígitos
+(\texttt{1\_\_2}, \texttt{1\_}), ponto sem dígito (\texttt{3.}) ou
+expoente sem dígitos (\texttt{1e+}).
 
 \subsection{Análise sintática}
 
@@ -276,19 +273,16 @@ reconhecimento falhar: alvo de atribuição, parâmetro repetido e
 argumento de tipo fora de \texttt{list}.
 
 \paragraph{LALR.} A especificação do Happy~\cite{happy} não estratifica
-as expressões: há uma única produção \texttt{Expr} com todos os
-operadores, e a precedência vem das diretivas, da menor para a maior:
-\texttt{LAMBDA}, a condicional (\texttt{\%right}), \texttt{or},
-\texttt{and}, \texttt{not}, os relacionais (\texttt{\%nonassoc}, o que
-rejeita \texttt{a < b < c}), \texttt{+ -}, \texttt{* / // \%},
-\texttt{**}, \texttt{NEG} (o menos unário, com \texttt{\%prec NEG}) e os
-pós-fixos. A primeira versão teve 16 conflitos shift/reduce, todos
-depois do corpo de uma lambda, diante de um operador: deslocar (o
-operador faz parte do corpo) ou reduzir. Dar baixa precedência a
-\texttt{'lambda'} não adiantou, porque a regra herda a precedência do
-seu último terminal, o \texttt{:}; a solução foi o pseudo-token
-\texttt{LAMBDA}, o mais fraco, com \texttt{\%prec LAMBDA} na regra. A
-gramática não tem conflitos.
+os operadores: há uma única produção, \texttt{Operacao}, com todos
+eles, e a precedência vem das diretivas, da menor para a maior:
+\texttt{or}, \texttt{and}, \texttt{not}, os relacionais
+(\texttt{\%nonassoc}, o que rejeita \texttt{a < b < c}), \texttt{+ -},
+\texttt{* / // \%}, \texttt{**} e \texttt{NEG} (o menos unário, com
+\texttt{\%prec NEG}). A lambda e a condicional ficam numa produção
+\texttt{Expr} à parte, como na GLC: que a condição de uma condicional
+não seja outra condicional, nenhuma diretiva expressa, porque diante do
+segundo \texttt{if} em \texttt{1 if 2 if 3 ...} o único movimento
+possível é deslocar. A gramática não tem conflitos.
 
 \subsection{Regras de contexto e mensagens de erro}
 \label{sec:ctx}
@@ -298,19 +292,18 @@ de laço são verificados sobre a AST (\texttt{Syntax/Validate.hs}), a
 mesma para os três parsers. O parâmetro repetido é verificado por cada
 parser ao fechar a lista, porque o arquivo \texttt{.err} aponta o
 \texttt{)}, posição que não fica na AST; no Happy, a lista virou uma
-produção própria, reduzida logo depois do \texttt{)}.
+produção própria, reduzida logo depois do \texttt{)}. Numa função
+local, \texttt{return} vale, mas o laço de fora não conta: um
+\texttt{break} ali é erro, como em Python.
 
-As mensagens seguem a seção 2.1 do enunciado, em stderr e com o nome do
-arquivo sem o diretório. Os erros sintáticos têm a forma
-\texttt{expected X, got Y}. No descendente recursivo, X é o que a função
-esperava. No LALR, \texttt{\%errorhandlertype explist} entrega os
-terminais aceitos no estado do erro, uma lista longa porque o estado
-mistura contextos, e vale o mais informativo (\texttt{:},
-\texttt{INDENT}, início de expressão, \texttt{NEWLINE}, nessa ordem). No
-PEG, a typed-peg dá a posição mais à direita em que alguma regra falhou
-e o que se esperava ali; os \texttt{\%label} nomeiam as regras e
-escondem o primeiro token das continuações opcionais, para que em
-\texttt{if x > 0} sem \texttt{:} a lista tenha só o \texttt{:}.
+As mensagens seguem a seção 2.1 do enunciado, com o nome do arquivo
+sem o diretório; as sintáticas são \texttt{expected X, got Y}. No
+descendente recursivo, X é o que a função esperava. No LALR,
+\texttt{\%errorhandlertype explist} entrega os terminais aceitos no
+estado do erro, e vale o mais informativo (\texttt{:}, \texttt{INDENT},
+início de expressão, \texttt{NEWLINE}). No PEG, a typed-peg dá a
+posição mais à direita em que alguma regra falhou, e os \texttt{\%label}
+nomeiam as regras e escondem as continuações opcionais.
 
 \subsection{Árvore de sintaxe abstrata}
 
@@ -320,7 +313,10 @@ A AST (\texttt{MiniPythonSyntax.hs}) tem um tipo para cada categoria:
 guarda a posição do token que o inicia. Declaração com anotação
 (\texttt{SVarDecl}) e atribuição (\texttt{SAssign}) são construtores
 distintos, e o alvo da atribuição é um \texttt{LValue}, o que torna
-impossível representar uma atribuição a uma chamada. A impressão usa
+impossível representar uma atribuição a uma chamada. Uma função local é
+o comando \texttt{SFunDef}; as de nível superior ficam em
+\texttt{DFun}, porque só elas serão generalizadas na inferência de
+tipos. A impressão usa
 \texttt{drawTree}: \texttt{toTree ::\ Program -> Tree String} põe no
 rótulo o construtor e os campos atômicos, com os tipos escritos como no
 fonte, e os blocos de \texttt{if}, \texttt{while} e \texttt{for} ficam
@@ -346,31 +342,22 @@ Program
 
 \subsection{Instruções de Uso}
 
-O projeto usa GHC 9.6 e cabal. Como a typed-peg 0.6 vem do Hackage,
-pode ser preciso atualizar o índice antes do primeiro build:
-
-\begin{lstlisting}[style=gram]
-cabal update
-cabal build
-cabal run mpyc -- --lex exemplos/fib.mpy
-cabal run mpyc -- --parse-peg exemplos/busca.mpy     # sem opcao vale --parse-rd
-cabal test                                           # ASTs e arquivos .err
-bash testes/rodar.sh                                 # o mesmo, pelo executavel
-\end{lstlisting}
+Com GHC 9.6 e cabal: \texttt{cabal update} (a typed-peg 0.6 vem do
+Hackage) e \texttt{cabal build}. Para rodar,
+\texttt{cabal run mpyc -{}- -{}-parse-peg exemplos/busca.mpy}; sem
+opção vale \texttt{-{}-parse-rd}. Os testes rodam com
+\texttt{cabal test} ou \texttt{bash testes/rodar.sh}.
 
 \subsection{Testes Realizados}
 
-Os testes usam os 82 programas de \texttt{exemplos/}: os do repositório,
-os de \texttt{valid/} e \texttt{invalid/} fornecidos com o enunciado e
-os 15 da seção 9 da especificação, em \texttt{especificacao/}. Um
-programa com arquivo \texttt{.err} ao lado é inválido, e a saída de erro
-de cada modo tem que ser exatamente o conteúdo do arquivo; são 22, entre
-eles os 15 de \texttt{invalid/lexical} e \texttt{invalid/syntax}. Os
-outros 60 são válidos (os de \texttt{invalid/semantic} só têm erros de
-tipo, assunto do próximo trabalho), e os três parsers têm que produzir a
-mesma AST, inclusive nas posições, que a árvore impressa não mostra. Os
-82 passam nos três modos, em \texttt{cabal test} e em
-\texttt{testes/rodar.sh}, que testa o executável.
+São 88 programas em \texttt{exemplos/}: os do repositório, os
+fornecidos com o enunciado e os 15 da seção 9 da especificação. Os 27
+com arquivo \texttt{.err} ao lado (entre eles os 15 de
+\texttt{invalid/lexical} e \texttt{invalid/syntax}) são inválidos, e a
+saída de erro de cada modo tem que ser exatamente o conteúdo do
+arquivo. Nos outros 61, os três parsers têm que produzir a mesma AST,
+posições incluídas; os de \texttt{invalid/semantic} só têm erros de
+tipo e contam como válidos. Os 88 passam nos três modos.
 
 \subsection{Dificuldades encontradas}
 
@@ -383,28 +370,26 @@ pela relação de coluna, e não por falta de entrada. Os testes com os
 \texttt{.err} mostraram o problema, e o fim do arquivo passou a ser
 testado sob \texttt{\_\textasciitilde}.
 
-\paragraph{Precedência e diferenças entre os parsers.} Os três liam
-\texttt{-2 ** 2} como \texttt{-(2 ** 2)}, contra a seção 6.3 da
-especificação, porque a ordem de \texttt{ExprUnaria} e \texttt{ExprPot}
-estava invertida na GLC; como concordavam entre si, só a releitura da
-especificação mostrou o erro. Já comparar as saídas dos três em
-construções menos comuns revelou problemas do LALR: declarava a
-condicional como \texttt{\%nonassoc} e recusava
-\texttt{a if b else c if d else e}, aceitava \texttt{2 ** -1}, que os
-outros recusavam, e não aceitava \texttt{pass} como corpo de classe.
-Todos foram corrigidos.
+\paragraph{Ambiguidade da lambda.} O LALR teve 16 conflitos
+shift/reduce depois do corpo de uma lambda, diante de um operador:
+deslocar (o operador faz parte do corpo) ou reduzir. A primeira solução
+foi um pseudo-token de menor precedência com \texttt{\%prec}, pois
+\texttt{'lambda'} com baixa precedência não adianta: a regra herda a do
+último terminal, o \texttt{:}. Mas os conflitos eram sintoma de uma
+ambiguidade da própria GLC, com a lambda entre os átomos; com ela no
+nível de \texttt{Expr}, nos três parsers, deixaram de existir.
 
-\paragraph{Posição do erro de indentação.} A primeira versão apontava o
-erro no primeiro token da linha mal indentada. Os arquivos \texttt{.err}
-apontam o fim da linha anterior, o mesmo lugar do \texttt{DEDENT} no
-exemplo de \texttt{-{}-lex}, e o analisador léxico passou a comparar os
-níveis ao processar aquele \texttt{NEWLINE}.
+\paragraph{Diferenças entre os parsers.} Os três liam \texttt{-2 ** 2}
+como \texttt{-(2 ** 2)}, contra a especificação, e só a releitura dela
+mostrou o erro. Comparar os três revelou problemas do LALR: aceitava
+\texttt{1 if 2 if 3 else 4 else 5}, que os outros recusam, e recusava
+\texttt{a if b else c if d else e} e o \texttt{pass} como corpo de
+classe. Todos foram corrigidos.
 
 \subsection{Limitações}
 
-Definições de função dentro de blocos não são aceitas: \texttt{def} só
-aparece no nível superior e como método. Em dois casos de erro fora dos
-testes, a mensagem do PEG difere da dos outros parsers: uma palavra
+Em dois casos de erro fora dos testes, a mensagem do PEG difere da dos
+outros parsers: uma palavra
 reservada onde se espera um nome (\texttt{for if in xs:}) sai como
 \texttt{unexpected 'if'}, e um parêntese não fechado na última linha é
 apontado no \texttt{\textbackslash n} dessa linha, e não no
@@ -419,9 +404,9 @@ apontado no \texttt{\textbackslash n} dessa linha, e não no
 \section{Conclusão}
 
 Os três parsers reconhecem a mesma linguagem e produzem a mesma AST. A
-GLC estratificada levou quase direto ao descendente recursivo; no LALR o
-esforço foi ler os conflitos, e no PEG, tratar léxico e indentação na
-própria gramática.
+GLC estratificada levou quase direto ao descendente recursivo; no LALR
+os conflitos revelaram a ambiguidade da lambda, e no PEG o trabalho foi
+tratar léxico e indentação na própria gramática.
 
 \begin{thebibliography}{9}
 \setlength{\itemsep}{0pt}

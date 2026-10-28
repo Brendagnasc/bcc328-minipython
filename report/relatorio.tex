@@ -38,10 +38,17 @@
 
 \lstset{style=mystyle}
 
-\title{Relatório de Projeto: Compilador MiniPython}
+% Gramaticas e saidas nao precisam de numero de linha.
+\lstdefinestyle{gram}{style=mystyle, numbers=none, basicstyle=\ttfamily\scriptsize}
+
+% Evita linhas estouradas por trechos longos em \texttt.
+\setlength{\emergencystretch}{1em}
+
+\title{Relatório de Projeto: Compilador MiniPython\\[4pt]
+\large Trabalho Prático 1: Análise Léxica e Sintática}
 \author{
-    Nome do Aluno \\
-    Matrícula: \\
+    Brenda Gabrielle Alves Nascimento \\
+    Matrícula: 24.1.4011 \\
     BCC328 - Construção de Compiladores I - DECOM/UFOP
 }
 \date{\today}
@@ -51,58 +58,390 @@
 \maketitle
 
 \begin{abstract}
+Este relatório descreve a primeira etapa do compilador MiniPython, em
+Haskell: o analisador léxico e três analisadores sintáticos que produzem
+a mesma árvore sintática abstrata (AST), um descendente recursivo
+(Megaparsec), um baseado em PEG (typed-peg) e um LALR (Happy).
 \end{abstract}
 
-\tableofcontents
+% O sumario foi retirado para caber no limite de 6 paginas.
+%\tableofcontents
 
 \section{Introdução}
+
+MiniPython é um subconjunto de Python 3 com anotações de tipo, classes
+com herança simples e funções anônimas, em que os blocos são delimitados
+por indentação. Este trabalho implementa as fases de análise léxica e
+sintática, acessíveis pelo executável \texttt{mpyc} com as opções
+\texttt{-{}-lex}, \texttt{-{}-parse-rd}, \texttt{-{}-parse-peg} e
+\texttt{-{}-parse-lalr}. As gramáticas também estão, com mais detalhes,
+em \texttt{docs/gramatica.md}.
 
 \section{Metodologia}
 
 \subsection{Estrutura sintática de MiniPython}
 
-\subsection{Sistema de tipos para MiniPython}
+\subsubsection*{Gramática livre de contexto}
 
-\subsection{Inferência de tipos para MiniPython}
+A GLC é escrita sobre os tokens do analisador léxico: os terminais em
+maiúsculas são classes de token e os entre aspas são o próprio lexema;
+\texttt{\{ X \}} é repetição e \texttt{[ X ]} é opcional. Os blocos são
+\texttt{NEWLINE INDENT ... DEDENT}, o análogo das chaves de C.
 
-\subsection{Semântica operacional para MiniPython}
+\begin{lstlisting}[style=gram]
+Programa     ::= { Decl } EOF
+Decl         ::= DefFuncao | DefClasse | Comando
+DefFuncao    ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
+Params       ::= Param { ',' Param }
+Param        ::= 'self' | IDENT [ ':' Tipo ]
+DefClasse    ::= 'class' IDENT [ '(' IDENT ')' ] ':' BlocoClasse
+BlocoClasse  ::= NEWLINE INDENT { Campo } { DefFuncao } [ 'pass' NEWLINE ] DEDENT
+Campo        ::= IDENT ':' Tipo NEWLINE
+Bloco        ::= NEWLINE INDENT Comando { Comando } DEDENT
+Tipo         ::= 'int' | 'float' | 'bool' | 'str' | 'None' | IDENT [ '[' Tipo ']' ]
+               | '(' [ Tipo { ',' Tipo } ] ')' '->' Tipo
+Comando      ::= ComandoSimples NEWLINE | ComandoIf | ComandoWhile | ComandoFor
+ComandoSimples ::= 'pass' | 'break' | 'continue' | 'return' [ Expr ] | Expr
+               | IDENT ':' Tipo '=' Expr | Alvo ( '=' | OpAumentado ) Expr
+Alvo         ::= IDENT | ExprPosfixa '[' Expr ']' | ExprPosfixa '.' IDENT
+OpAumentado  ::= '+=' | '-=' | '*=' | '/=' | '//=' | '%='
+ComandoIf    ::= 'if' Expr ':' Bloco { 'elif' Expr ':' Bloco } [ 'else' ':' Bloco ]
+ComandoWhile ::= 'while' Expr ':' Bloco
+ComandoFor   ::= 'for' IDENT 'in' Expr ':' Bloco
+Expr         ::= ExprOu [ 'if' ExprOu 'else' Expr ]
+ExprOu       ::= ExprE { 'or' ExprE }
+ExprE        ::= ExprNao { 'and' ExprNao }
+ExprNao      ::= 'not' ExprNao | ExprRel
+ExprRel      ::= ExprAdit [ ( '==' | '!=' | '<' | '<=' | '>' | '>=' ) ExprAdit ]
+ExprAdit     ::= ExprMult { ( '+' | '-' ) ExprMult }
+ExprMult     ::= ExprPot { ( '*' | '/' | '//' | '%' ) ExprPot }
+ExprPot      ::= ExprUnaria [ '**' ExprPot ]
+ExprUnaria   ::= '-' ExprUnaria | ExprPosfixa
+ExprPosfixa  ::= Atomo { '(' [ Args ] ')' | '[' Expr ']' | '.' IDENT }
+Args         ::= Expr { ',' Expr }
+Atomo        ::= INT_LIT | FLOAT_LIT | STRING_LIT | BOOL_LIT | 'None' | 'self' | IDENT
+               | 'int' | 'float' | 'str' | 'bool' | '[' [ Args ] ']' | '(' Expr ')'
+               | 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
+\end{lstlisting}
 
+A precedência e a associatividade ficam na própria forma das produções,
+do nível mais fraco para o mais forte: condicional (à direita),
+\texttt{or}, \texttt{and} (à esquerda), \texttt{not} (prefixo),
+relacionais (não associativos), \texttt{+ -} e \texttt{* / // \%} (à
+esquerda), \texttt{**} (à direita), menos unário e os pós-fixos. As
+repetições \texttt{\{ op B \}} evitam a recursão à esquerda, que
+impediria a implementação descendente~\cite{appel1998}, e
+\texttt{ExprRel} admite um só relacional (\texttt{a < b < c} é erro de
+sintaxe). A seção 6.3 da especificação põe o
+menos unário acima de \texttt{**}; como os operandos de \texttt{**} são
+\texttt{ExprUnaria}, \texttt{-2 ** 2} é \texttt{(-2) ** 2} e
+\texttt{2 ** -1} é aceito, ao contrário de Python. O ramo \texttt{else}
+da condicional e o corpo da lambda são \texttt{Expr} completas, o que
+torna a condicional associativa à direita e deixa
+\texttt{lambda x: x if x > 0 else -x} sem ambiguidade. Por fim,
+\texttt{list} não é palavra reservada: o tipo lista é um \texttt{IDENT}
+seguido de \texttt{[ Tipo ]}, e só \texttt{list} aceita esse argumento;
+sem colchetes, um nome com inicial maiúscula é tipo de classe e os
+demais são variáveis de tipo (seção 3.5).
+
+\subsubsection*{Gramática PEG}
+
+A typed-peg~\cite{typedpeg} lê caracteres, e não tokens, então a
+gramática PEG~\cite{ford2004} descreve também a parte léxica e a
+indentação. Além da notação usual (\texttt{/} é a escolha ordenada,
+\texttt{\&} e \texttt{!} são predicados), há as anotações de layout da
+biblioteca, que seguem o modelo de Adams~\cite{adams2013}:
+\texttt{e\^{}>} é um bloco mais à direita que o comando que o contém,
+\texttt{|e|} exige que \texttt{e} comece alinhado com o bloco e
+\texttt{e\_\textasciitilde} libera a coluna dentro de \texttt{e}. Ficam
+implícitos o \texttt{Espaco} que todo token consome depois de si e o
+\texttt{![a-zA-Z0-9\_]} depois de cada palavra reservada;
+\texttt{Reservada} lista as 24 palavras reservadas da seção 2 do
+enunciado.
+
+\begin{lstlisting}[style=gram]
+Programa     <- Brancos (Ind |Decl|)* Fim
+Decl         <- DefFuncao / DefClasse / Comando
+DefFuncao    <- 'def' Nome '(' (Params ')')_~ ('->' Tipo)? ':' Suite
+Params       <- (Param (',' Param)*)?
+Param        <- 'self' / Nome (':' Tipo)?
+DefClasse    <- 'class' Nome ('(' Nome ')')? ':' FimLinha Ind Membros^>
+Membros      <- |Campo| (Ind |Campo|)* (Ind |DefFuncao|)* PassFinal?
+              / |DefFuncao| (Ind |DefFuncao|)* PassFinal? / |'pass'| FimLinha
+PassFinal    <- Ind |'pass'| FimLinha
+Campo        <- Nome ':' Tipo FimLinha
+Suite        <- FimLinha Ind (|Comando| (Ind |Comando|)*)^>
+Comando      <- ComandoIf / ComandoWhile / ComandoFor / ComandoSimples FimLinha
+ComandoIf    <- 'if' Expr ':' Suite (Ind |'elif'| Expr ':' Suite)*
+                (Ind |'else'| ':' Suite)?
+ComandoWhile <- 'while' Expr ':' Suite
+ComandoFor   <- 'for' Nome 'in' Expr ':' Suite
+ComandoSimples <- 'pass' / 'break' / 'continue' / 'return' Expr?
+              / Nome ':' Tipo '=' !'=' Expr / Expr (OpAtrib Expr)?
+OpAtrib      <- '=' !'=' / '+=' / '-=' / '*=' / '//=' / '/=' / '%='
+Tipo         <- 'int' / 'float' / 'bool' / 'str' / 'None'
+              / '(' ((Tipo (',' Tipo)*)? ')')_~ '->' Tipo / Nome ('[' (Tipo ']')_~)?
+Expr         <- ExprOu ('if' ExprOu 'else' Expr)?
+ExprOu       <- ExprE ('or' ExprE)*
+ExprE        <- ExprNao ('and' ExprNao)*
+ExprNao      <- 'not' ExprNao / ExprRel
+ExprRel      <- ExprAdit (('==' / '!=' / '<=' / '>=' / '<' / '>') ExprAdit)?
+ExprAdit     <- ExprMult (('+' !'=' / '-' ![=>]) ExprMult)*
+ExprMult     <- ExprPot (('//' !'=' / '/' !'=' / '%' !'=' / '*' ![*=]) ExprPot)*
+ExprPot      <- ExprUnaria ('**' ExprPot)?
+ExprUnaria   <- '-' ![=>] ExprUnaria / ExprPosfixa
+ExprPosfixa  <- Atomo ('(' (Args ')')_~ / '[' (Expr ']')_~ / '.' Nome)*
+Args         <- (Expr (',' Expr)*)?
+Atomo        <- 'True' / 'False' / 'None' / 'self' / 'int' / 'float' / 'str' / 'bool'
+              / Nome / Numero / String / '[' (Args ']')_~ / '(' (Expr ')')_~
+              / 'lambda' (Nome (',' Nome)*)? ':' Expr
+EspacoLinha  <- ([ \t\r] / '#' [^\n]*)*
+Espaco       <- ([ \t\r] / '#' [^\n]* / &('\n' .) '\n')*
+FimLinha     <- (EspacoLinha ('\n' / !.) Brancos)_~
+Brancos      <- (EspacoLinha '\n')*_~
+Ind          <- [ \t]*_~
+Fim          <- (EspacoLinha !.)_~
+Nome         <- !Reservada [a-zA-Z_] [a-zA-Z0-9_]*
+Reservada    <- ('and' / 'break' / ... / 'int' / 'in' / ... / 'while') ![a-zA-Z0-9_]
+Numero       <- [0-9] [0-9_]* ('.' [0-9] [0-9_]*)? ([eE] [+-]? [0-9]+)?
+String       <- '"' (Escape / [^"\\\n])* '"' / '\'' (Escape / [^'\\\n])* '\''
+Escape       <- '\\' [ntr\\"']
+\end{lstlisting}
+
+A relação padrão entre tokens é \texttt{gtR}: depois do primeiro token,
+o resto do comando fica à direita da coluna do comando. Isso resolve
+também as quebras de linha, porque \texttt{Espaco} só consome um
+\texttt{\textbackslash n} se o primeiro caractere da linha seguinte for
+aceito pela relação em vigor: sob \texttt{gtR} a coluna 0 nunca é, e a
+quebra encerra o comando; sob \texttt{\_\textasciitilde}, dentro de
+parênteses e colchetes, ela vira espaço. Na escolha ordenada, a
+declaração vem antes da atribuição, \texttt{'int'} antes de
+\texttt{'in'} e os predicados nos operadores fazem o papel do casamento
+mais longo do analisador léxico (\texttt{+} não pode começar
+\texttt{+=}).
+
+%\subsection{Sistema de tipos para MiniPython}
+%\subsection{Inferência de tipos para MiniPython}
+%\subsection{Semântica operacional para MiniPython}
 
 \section{Arquitetura do Compilador}
 
+O código está em \texttt{src/MiniPython/Frontend}, separado em
+\texttt{Lexer}, \texttt{Parser}, \texttt{Syntax} e \texttt{Pretty}. O
+executável roda sempre o analisador léxico primeiro e, conforme a opção,
+um dos três parsers e a verificação de contexto da Seção~\ref{sec:ctx}.
+
 \subsection{Análise léxica}
+
+O scanner (\texttt{MiniPythonLexer.hs}) é escrito à mão: percorre o
+texto mantendo linha e coluna, descarta comentários, expande tabulações
+até a próxima coluna múltipla de 8 e emite um \texttt{NEWLINE} ao fim de
+cada linha física. Uma segunda passada (\texttt{Indent.hs}) aplica o
+algoritmo da seção 4.5 da especificação: compara a coluna do primeiro
+token de cada linha lógica com o topo da pilha de níveis, descarta o
+\texttt{NEWLINE} de linhas em branco e de linhas dentro de parênteses ou
+colchetes e fecha os blocos que restam antes do \texttt{EOF}. Com as duas
+passadas separadas, o scanner não guarda nenhum estado de indentação.
+
+Os construtores do tipo dos tokens têm os nomes da tabela da seção 2.2
+do enunciado (\texttt{TkDef}, \texttt{TkIdent \textquotedbl{}fib\textquotedbl}, \ldots), e cada
+linha de \texttt{-{}-lex} é a posição seguida do \texttt{show} do token;
+o \texttt{Show} derivado é usado só para tokens, nunca para a AST. O
+\texttt{INDENT} fica no primeiro token da linha indentada, o
+\texttt{DEDENT} e o erro de indentação no \texttt{NEWLINE} da linha
+anterior, onde o bloco se fecha, e o \texttt{EOF} sai como
+\texttt{0:0}. Os erros léxicos são caractere inválido, string não
+terminada, float sem dígito depois do ponto, escape inválido e nível de
+indentação fora da pilha.
 
 \subsection{Análise sintática}
 
+\paragraph{Descendente recursivo.} Escrito com Megaparsec~\cite{megaparsec}
+sobre a lista de tokens, por meio de uma instância de \texttt{Stream}.
+Cada não terminal da GLC é uma função, e a produção é escolhida olhando
+o próximo token; só a declaração de variável e o campo de classe
+precisam ver dois (\texttt{IDENT} seguido de \texttt{:}), e não há
+\texttt{try}. A atribuição é lida como uma expressão que depois é
+convertida em alvo, o que dispensa decidir de antemão entre
+\texttt{Alvo} e \texttt{Expr}.
+
+\paragraph{PEG.} Escrito com o quasi-quoter \texttt{pegGrammar}, com as
+diretivas \texttt{\%name}, \texttt{\%stream String}, \texttt{\%param src
+::\ Source} e \texttt{\%start}. A versão usada é a 0.6, porque a 0.4 só
+informa que o reconhecimento falhou, sem posição, e não dá às ações o
+deslocamento atual, de onde vêm as posições da AST (átomo \texttt{@}).
+As regras de comando devolvem \texttt{Either Error}, porque três
+restrições só podem ser verificadas na ação semântica, que não faz o
+reconhecimento falhar: alvo de atribuição, parâmetro repetido e
+argumento de tipo fora de \texttt{list}.
+
+\paragraph{LALR.} A especificação do Happy~\cite{happy} não estratifica
+as expressões: há uma única produção \texttt{Expr} com todos os
+operadores, e a precedência vem das diretivas, da menor para a maior:
+\texttt{LAMBDA}, a condicional (\texttt{\%right}), \texttt{or},
+\texttt{and}, \texttt{not}, os relacionais (\texttt{\%nonassoc}, o que
+rejeita \texttt{a < b < c}), \texttt{+ -}, \texttt{* / // \%},
+\texttt{**}, \texttt{NEG} (o menos unário, com \texttt{\%prec NEG}) e os
+pós-fixos. A primeira versão teve 16 conflitos shift/reduce, todos
+depois do corpo de uma lambda, diante de um operador: deslocar (o
+operador faz parte do corpo) ou reduzir. Dar baixa precedência a
+\texttt{'lambda'} não adiantou, porque a regra herda a precedência do
+seu último terminal, o \texttt{:}; a solução foi o pseudo-token
+\texttt{LAMBDA}, o mais fraco, com \texttt{\%prec LAMBDA} na regra. A
+gramática não tem conflitos.
+
+\subsection{Regras de contexto e mensagens de erro}
+\label{sec:ctx}
+
+\texttt{return} fora de função e \texttt{break} ou \texttt{continue} fora
+de laço são verificados sobre a AST (\texttt{Syntax/Validate.hs}), a
+mesma para os três parsers. O parâmetro repetido é verificado por cada
+parser ao fechar a lista, porque o arquivo \texttt{.err} aponta o
+\texttt{)}, posição que não fica na AST; no Happy, a lista virou uma
+produção própria, reduzida logo depois do \texttt{)}.
+
+As mensagens seguem a seção 2.1 do enunciado, em stderr e com o nome do
+arquivo sem o diretório. Os erros sintáticos têm a forma
+\texttt{expected X, got Y}. No descendente recursivo, X é o que a função
+esperava. No LALR, \texttt{\%errorhandlertype explist} entrega os
+terminais aceitos no estado do erro, uma lista longa porque o estado
+mistura contextos, e vale o mais informativo (\texttt{:},
+\texttt{INDENT}, início de expressão, \texttt{NEWLINE}, nessa ordem). No
+PEG, a typed-peg dá a posição mais à direita em que alguma regra falhou
+e o que se esperava ali; os \texttt{\%label} nomeiam as regras e
+escondem o primeiro token das continuações opcionais, para que em
+\texttt{if x > 0} sem \texttt{:} a lista tenha só o \texttt{:}.
+
 \subsection{Árvore de sintaxe abstrata}
 
-\subsection{Análise semântica}
+A AST (\texttt{MiniPythonSyntax.hs}) tem um tipo para cada categoria:
+\texttt{Program}, \texttt{Decl}, \texttt{FunDef}, \texttt{ClassDef},
+\texttt{Stmt}, \texttt{LValue}, \texttt{Expr} e \texttt{Type}, e todo nó
+guarda a posição do token que o inicia. Declaração com anotação
+(\texttt{SVarDecl}) e atribuição (\texttt{SAssign}) são construtores
+distintos, e o alvo da atribuição é um \texttt{LValue}, o que torna
+impossível representar uma atribuição a uma chamada. A impressão usa
+\texttt{drawTree}: \texttt{toTree ::\ Program -> Tree String} põe no
+rótulo o construtor e os campos atômicos, com os tipos escritos como no
+fonte, e os blocos de \texttt{if}, \texttt{while} e \texttt{for} ficam
+sob nós auxiliares em minúsculas (\texttt{then}, \texttt{elif},
+\texttt{else}, \texttt{body}). Para \texttt{x: int = 1 + 2}:
 
-\subsection{Geração de código}
+\begin{lstlisting}[style=gram]
+Program
+|
+`- SVarDecl x: int
+   |
+   `- EBinOp Add
+      |
+      +- EInt 1
+      |
+      `- EInt 2
+\end{lstlisting}
+
+%\subsection{Análise semântica}
+%\subsection{Geração de código}
 
 \section{Resultados e Discussão}
 
 \subsection{Instruções de Uso}
 
+O projeto usa GHC 9.6 e cabal. Como a typed-peg 0.6 vem do Hackage,
+pode ser preciso atualizar o índice antes do primeiro build:
+
+\begin{lstlisting}[style=gram]
+cabal update
+cabal build
+cabal run mpyc -- --lex exemplos/fib.mpy
+cabal run mpyc -- --parse-peg exemplos/busca.mpy     # sem opcao vale --parse-rd
+cabal test                                           # ASTs e arquivos .err
+bash testes/rodar.sh                                 # o mesmo, pelo executavel
+\end{lstlisting}
 
 \subsection{Testes Realizados}
 
+Os testes usam os 82 programas de \texttt{exemplos/}: os do repositório,
+os de \texttt{valid/} e \texttt{invalid/} fornecidos com o enunciado e
+os 15 da seção 9 da especificação, em \texttt{especificacao/}. Um
+programa com arquivo \texttt{.err} ao lado é inválido, e a saída de erro
+de cada modo tem que ser exatamente o conteúdo do arquivo; são 22, entre
+eles os 15 de \texttt{invalid/lexical} e \texttt{invalid/syntax}. Os
+outros 60 são válidos (os de \texttt{invalid/semantic} só têm erros de
+tipo, assunto do próximo trabalho), e os três parsers têm que produzir a
+mesma AST, inclusive nas posições, que a árvore impressa não mostra. Os
+82 passam nos três modos, em \texttt{cabal test} e em
+\texttt{testes/rodar.sh}, que testa o executável.
+
+\subsection{Dificuldades encontradas}
+
+\paragraph{Mensagens e posições do PEG.} Com a typed-peg 0.4 não havia
+como apontar o erro, e a solução foi usar a 0.6, permitida pelo
+enunciado. Mesmo assim, a primeira versão aceitava programas inválidos:
+sob \texttt{gtR}, o \texttt{!.} do fim do programa tinha sucesso no meio
+do arquivo, porque o primeiro caractere da linha seguinte era recusado
+pela relação de coluna, e não por falta de entrada. Os testes com os
+\texttt{.err} mostraram o problema, e o fim do arquivo passou a ser
+testado sob \texttt{\_\textasciitilde}.
+
+\paragraph{Precedência e diferenças entre os parsers.} Os três liam
+\texttt{-2 ** 2} como \texttt{-(2 ** 2)}, contra a seção 6.3 da
+especificação, porque a ordem de \texttt{ExprUnaria} e \texttt{ExprPot}
+estava invertida na GLC; como concordavam entre si, só a releitura da
+especificação mostrou o erro. Já comparar as saídas dos três em
+construções menos comuns revelou problemas do LALR: declarava a
+condicional como \texttt{\%nonassoc} e recusava
+\texttt{a if b else c if d else e}, aceitava \texttt{2 ** -1}, que os
+outros recusavam, e não aceitava \texttt{pass} como corpo de classe.
+Todos foram corrigidos.
+
+\paragraph{Posição do erro de indentação.} A primeira versão apontava o
+erro no primeiro token da linha mal indentada. Os arquivos \texttt{.err}
+apontam o fim da linha anterior, o mesmo lugar do \texttt{DEDENT} no
+exemplo de \texttt{-{}-lex}, e o analisador léxico passou a comparar os
+níveis ao processar aquele \texttt{NEWLINE}.
 
 \subsection{Limitações}
 
+Definições de função dentro de blocos não são aceitas: \texttt{def} só
+aparece no nível superior e como método. Em dois casos de erro fora dos
+testes, a mensagem do PEG difere da dos outros parsers: uma palavra
+reservada onde se espera um nome (\texttt{for if in xs:}) sai como
+\texttt{unexpected 'if'}, e um parêntese não fechado na última linha é
+apontado no \texttt{\textbackslash n} dessa linha, e não no
+\texttt{NEWLINE} que o analisador léxico gera no fim do arquivo.
+
+\section{Uso de IA generativa}
+
+% O item 4 da secao 8 do enunciado pede todos os prompts usados, a
+% resposta obtida e o que foi preciso modificar para usar a resposta.
+\textbf{[A preencher: prompts utilizados, respostas obtidas e modificações feitas.]}
+
 \section{Conclusão}
 
-\section{Referências}
+Os três parsers reconhecem a mesma linguagem e produzem a mesma AST. A
+GLC estratificada levou quase direto ao descendente recursivo; no LALR o
+esforço foi ler os conflitos, e no PEG, tratar léxico e indentação na
+própria gramática.
 
 \begin{thebibliography}{9}
-\bibitem{hutton2016}
-Hutton, G. (2016). \emph{Programming in Haskell}. Cambridge University Press.
-
+\setlength{\itemsep}{0pt}
 \bibitem{appel1998}
 Appel, A. W. (1998). \emph{Modern Compiler Implementation in ML}. Cambridge University Press.
 
-\bibitem{webassembly2023}
-WebAssembly Community Group. (2023). \emph{WebAssembly Specification}.
+\bibitem{ford2004}
+Ford, B. (2004). Parsing Expression Grammars: A Recognition-Based Syntactic Foundation. In \emph{POPL '04}. ACM.
+
+\bibitem{adams2013}
+Adams, M. D. (2013). Principled Parsing for Indentation-Sensitive Languages: Revisiting Landin's Offside Rule. In \emph{POPL '13}. ACM.
+
+\bibitem{typedpeg}
+Ribeiro, R. (2026). \emph{typed-peg: Type-safe PEG parser combinators}, versão 0.6.0.0. Hackage.
+
+\bibitem{megaparsec}
+Karpov, M. \emph{megaparsec: Monadic parser combinators}, versão 9.8. Hackage.
+
+\bibitem{happy}
+Marlow, S.; Gill, A. \emph{Happy: The Parser Generator for Haskell}, versão 2.2.
 \end{thebibliography}
 
 \end{document}

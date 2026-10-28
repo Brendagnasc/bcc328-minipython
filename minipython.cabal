@@ -21,8 +21,6 @@ library
                     , MiniPython.Frontend.Syntax.MiniPythonSyntax
                     , MiniPython.Frontend.Syntax.Validate
                     , MiniPython.Frontend.Pretty.MiniPythonPretty
-                    , MiniPython.Frontend.Parser.Core
-                    , MiniPython.Frontend.Parser.Expr
                     , MiniPython.Frontend.Parser.RecursiveDescent
                     , MiniPython.Frontend.Parser.Stream
                     , MiniPython.Frontend.Parser.PEG

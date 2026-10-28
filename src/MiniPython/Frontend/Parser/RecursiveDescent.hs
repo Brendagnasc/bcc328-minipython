@@ -1,107 +1,202 @@
--- | Analisador descendente recursivo: comandos e declaracoes.
+-- | Analisador sintatico descendente recursivo, escrito com Megaparsec.
 --
 -- Cada funcao corresponde a um nao terminal da GLC proposta em
--- docs/gramatica.md. O ponto de entrada e pProgram.
+-- docs/gramatica.md. O parser le a lista de tokens do analisador
+-- lexico, ja com INDENT e DEDENT, e escolhe cada producao olhando o
+-- proximo token; so a declaracao de variavel e o campo de classe
+-- precisam ver dois (IDENT seguido de ':'). Como nenhuma alternativa e
+-- tentada e desfeita, nao ha try.
+--
+-- As mensagens de erro sao montadas aqui mesmo, no formato dos arquivos
+-- .err (expected X, got Y), e viajam como erro customizado do
+-- Megaparsec, que as devolve sem alteracao.
 module MiniPython.Frontend.Parser.RecursiveDescent
   ( parseProgram
   ) where
 
 import Data.Char (isUpper)
+import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as Set
 import MiniPython.Frontend.Lexer.Token
-import MiniPython.Frontend.Parser.Core
-import MiniPython.Frontend.Parser.Expr
+import MiniPython.Frontend.Parser.Stream
 import MiniPython.Frontend.Syntax.MiniPythonSyntax
+import MiniPython.Frontend.Syntax.Validate (duplicateParam)
+import MiniPython.Utils.Error
+import Text.Megaparsec
+  ( ErrorFancy (..)
+  , ParseError (..)
+  , ParseErrorBundle (..)
+  , Parsec
+  , ShowErrorComponent (..)
+  , anySingle
+  , customFailure
+  , errorOffset
+  , getInput
+  , lookAhead
+  , runParser
+  )
+
+-- | Erro customizado: a mensagem pronta e a posicao a que ela se refere.
+newtype Failure = Failure Error
+  deriving (Eq, Ord)
+
+instance ShowErrorComponent Failure where
+  showErrorComponent (Failure e) = errMsg e
+
+type Parser = Parsec Failure TokenStream
 
 -- | Reconhece um programa completo a partir da lista de tokens.
-parseProgram :: [Token] -> Either ParseError Program
-parseProgram = runFully pProgram
+parseProgram :: [Token] -> Either Error Program
+parseProgram toks = case runParser pProgram "" (toStream toks) of
+  Right prog  -> Right prog
+  Left bundle -> Left (bundleError toks bundle)
+
+-- | Todas as falhas deste parser sao customizadas. O caso trivial so
+-- existe para que a funcao seja total.
+bundleError :: [Token] -> ParseErrorBundle TokenStream Failure -> Error
+bundleError toks bundle = case NE.head (bundleErrors bundle) of
+  FancyError _ items | (ErrorCustom (Failure e) : _) <- Set.toList items -> e
+  err -> case drop (errorOffset err) toks of
+    (t : _) -> Error (tokPos t) ("unexpected " ++ describeLexeme (tokLexeme t))
+    []      -> Error initialPos "unexpected end of input"
+
+-- Primitivas ----------------------------------------------------------
+
+-- | Proximo token, sem consumir. O fluxo sempre termina em TkEOF, que
+-- so e consumido no fim de pProgram.
+peekToken :: Parser Token
+peekToken = lookAhead anySingle
+
+peekLexeme :: Parser Lexeme
+peekLexeme = tokLexeme <$> peekToken
+
+-- | Os dois proximos lexemas.
+peekTwo :: Parser (Lexeme, Lexeme)
+peekTwo = do
+  TokenStream ts <- getInput
+  pure $ case map tokLexeme ts of
+    (a : b : _) -> (a, b)
+    [a]         -> (a, TkEOF)
+    []          -> (TkEOF, TkEOF)
+
+advance :: Parser Token
+advance = anySingle
+
+failAt :: Pos -> String -> Parser a
+failAt p msg = customFailure (Failure (Error p msg))
+
+-- | Falha com "expected X, got Y", sendo Y o proximo token.
+expected :: String -> Parser a
+expected what = do
+  t <- peekToken
+  failAt (tokPos t) ("expected " ++ what ++ ", got " ++ describeLexeme (tokLexeme t))
+
+-- | Consome o lexema dado ou falha dizendo que era ele o esperado.
+expect :: Lexeme -> Parser Token
+expect lx = do
+  l <- peekLexeme
+  if l == lx then advance else expected (expectedLexeme lx)
+
+-- | Consome o lexema se ele for o proximo.
+accept :: Lexeme -> Parser Bool
+accept lx = do
+  l <- peekLexeme
+  if l == lx then True <$ advance else pure False
+
+expectIdent :: Parser (Pos, Name)
+expectIdent = do
+  t <- peekToken
+  case tokLexeme t of
+    TkIdent n -> (tokPos t, n) <$ advance
+    _         -> expected "identifier"
+
+-- | Um ou mais itens separados por virgula.
+commaSep1 :: Parser a -> Parser [a]
+commaSep1 p = (:) <$> p <*> go
+  where
+    go = do
+      more <- accept TkComma
+      if more then (:) <$> p <*> go else pure []
+
+-- | Lista separada por virgula, possivelmente vazia, que termina no
+-- lexema dado. O lexema final nao e consumido.
+commaSepUntil :: Lexeme -> Parser a -> Parser [a]
+commaSepUntil close p = do
+  l <- peekLexeme
+  if l == close then pure [] else commaSep1 p
+
+-- Programa e declaracoes ----------------------------------------------
 
 -- | Programa ::= { Decl } EOF
 pProgram :: Parser Program
-pProgram = Program <$> many0 maisDecls pDecl
+pProgram = Program <$> go
   where
-    maisDecls = do
-      t <- peek
-      pure (tokLexeme t /= TkEOF)
+    go = do
+      l <- peekLexeme
+      if l == TkEOF then [] <$ advance else (:) <$> pDecl <*> go
 
 -- | Decl ::= DefFuncao | DefClasse | Comando
 pDecl :: Parser Decl
 pDecl = do
-  t <- peek
-  case tokLexeme t of
+  l <- peekLexeme
+  case l of
     TkDef   -> DFun <$> pFunDef
     TkClass -> DClass <$> pClassDef
-    _      -> DStmt <$> pStmt
+    _       -> DStmt <$> pStmt
 
 -- | DefFuncao ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
 pFunDef :: Parser FunDef
 pFunDef = do
-  t <- expect TkDef "def" "definicao de funcao"
-  (_, nome) <- expectIdent "definicao de funcao"
-  _ <- expect TkLParen "(" "definicao de funcao"
-  ps <- pParams
-  _ <- expect TkRParen ")" "definicao de funcao"
+  t <- expect TkDef
+  (_, nome) <- expectIdent
+  _ <- expect TkLParen
+  ps <- commaSepUntil TkRParen pParam
+  fecha <- expect TkRParen
+  -- O parametro repetido e apontado no ')', quando a lista ja foi lida.
+  mapM_ (\n -> failAt (tokPos fecha) ("duplicate parameter: '" ++ n ++ "'"))
+        (duplicateParam ps)
   ret <- pOptReturn
-  _ <- expect TkColon ":" "definicao de funcao"
-  corpo <- pBlock
-  pure (FunDef (tokPos t) nome ps ret corpo)
+  _ <- expect TkColon
+  FunDef (tokPos t) nome ps ret <$> pBlock
 
 pOptReturn :: Parser (Maybe Type)
 pOptReturn = do
-  m <- accept TkArrow
-  case m of
-    Nothing -> pure Nothing
-    Just _  -> Just <$> pType
+  seta <- accept TkArrow
+  if seta then Just <$> pType else pure Nothing
 
--- | Params ::= Param { ',' Param }, possivelmente vazio.
-pParams :: Parser [Param]
-pParams = do
-  vazio <- check TkRParen
-  if vazio then pure [] else sepBy1 TkComma pParam
-
--- | Param ::= IDENT [ ':' Tipo ]
+-- | Param ::= 'self' | IDENT [ ':' Tipo ]
 --
 -- Em metodos, self aparece como primeiro parametro. Como self e
 -- palavra reservada (secao 4.2), ele nao casa com IDENT e e tratado
 -- a parte.
 pParam :: Parser Param
 pParam = do
-  t <- peek
+  t <- peekToken
   case tokLexeme t of
-    TkSelf -> do
-      _ <- advance
-      pure (Param (tokPos t) "self" Nothing)
+    TkSelf -> Param (tokPos t) "self" Nothing <$ advance
     _ -> do
-      (p, nome) <- expectIdent "parametro"
-      anot <- pOptAnnotation
+      (p, nome) <- expectIdent
+      doisPontos <- accept TkColon
+      anot <- if doisPontos then Just <$> pType else pure Nothing
       pure (Param p nome anot)
-
-pOptAnnotation :: Parser (Maybe Type)
-pOptAnnotation = do
-  m <- accept TkColon
-  case m of
-    Nothing -> pure Nothing
-    Just _  -> Just <$> pType
 
 -- | DefClasse ::= 'class' IDENT [ '(' IDENT ')' ] ':' BlocoClasse
 pClassDef :: Parser ClassDef
 pClassDef = do
-  t <- expect TkClass "class" "definicao de classe"
-  (_, nome) <- expectIdent "definicao de classe"
+  t <- expect TkClass
+  (_, nome) <- expectIdent
   super <- pOptSuper
-  _ <- expect TkColon ":" "definicao de classe"
+  _ <- expect TkColon
   (campos, metodos) <- pClassBlock
   pure (ClassDef (tokPos t) nome super campos metodos)
 
 pOptSuper :: Parser (Maybe Name)
 pOptSuper = do
-  m <- accept TkLParen
-  case m of
-    Nothing -> pure Nothing
-    Just _ -> do
-      (_, nome) <- expectIdent "superclasse"
-      _ <- expect TkRParen ")" "superclasse"
-      pure (Just nome)
+  abre <- accept TkLParen
+  if not abre then pure Nothing else do
+    (_, nome) <- expectIdent
+    _ <- expect TkRParen
+    pure (Just nome)
 
 -- | BlocoClasse ::= NEWLINE INDENT { Campo } { DefFuncao } DEDENT
 --
@@ -109,160 +204,140 @@ pOptSuper = do
 -- nem metodos tem como corpo o comando pass, que e descartado.
 pClassBlock :: Parser ([Field], [FunDef])
 pClassBlock = do
-  _ <- expect TkNewline "fim de linha" "corpo de classe"
-  _ <- expect TkIndent "aumento de indentacao" "corpo de classe"
-  campos <- many0 ehCampo pField
-  metodos <- many0 (check TkDef) pFunDef
-  _ <- pSkipPass
-  _ <- expect TkDedent "fim de bloco" "corpo de classe"
+  _ <- expect TkNewline
+  _ <- expect TkIndent
+  campos <- while ehCampo pField
+  metodos <- while ((== TkDef) <$> peekLexeme) pFunDef
+  passo <- accept TkPass
+  _ <- if passo then () <$ expect TkNewline else pure ()
+  _ <- expect TkDedent
   pure (campos, metodos)
   where
-    -- Um campo comeca com IDENT seguido de ':'; um metodo comeca
-    -- com def. O segundo token distingue campo de comando solto.
+    -- Um campo comeca com IDENT seguido de ':'.
     ehCampo = do
-      t <- peek
-      case tokLexeme t of
-        TkIdent _ -> do
-          mnext <- peekAt 1
-          pure (fmap tokLexeme mnext == Just TkColon)
-        _ -> pure False
+      (a, b) <- peekTwo
+      pure (isIdent a && b == TkColon)
 
--- | Consome um pass isolado no corpo de uma classe vazia.
-pSkipPass :: Parser ()
-pSkipPass = do
-  m <- accept TkPass
-  case m of
-    Nothing -> pure ()
-    Just _  -> () <$ expect TkNewline "fim de linha" "corpo de classe"
+-- | Repete o parser enquanto a condicao, que nao consome, valer.
+while :: Parser Bool -> Parser a -> Parser [a]
+while cond p = do
+  continua <- cond
+  if continua then (:) <$> p <*> while cond p else pure []
 
 -- | Campo ::= IDENT ':' Tipo NEWLINE
 pField :: Parser Field
 pField = do
-  (p, nome) <- expectIdent "campo de classe"
-  _ <- expect TkColon ":" "campo de classe"
+  (p, nome) <- expectIdent
+  _ <- expect TkColon
   t <- pType
-  _ <- expect TkNewline "fim de linha" "campo de classe"
+  _ <- expect TkNewline
   pure (Field p nome t)
 
 -- | Bloco ::= NEWLINE INDENT Comando { Comando } DEDENT
 pBlock :: Parser Block
 pBlock = do
-  _ <- expect TkNewline "fim de linha" "bloco"
-  _ <- expect TkIndent "aumento de indentacao" "bloco"
+  _ <- expect TkNewline
+  _ <- expect TkIndent
   primeiro <- pStmt
-  resto <- many0 maisStmts pStmt
-  _ <- expect TkDedent "fim de bloco" "bloco"
+  resto <- while maisComandos pStmt
+  _ <- expect TkDedent
   pure (primeiro : resto)
   where
-    maisStmts = do
-      t <- peek
-      pure (tokLexeme t /= TkDedent && tokLexeme t /= TkEOF)
+    maisComandos = (`notElem` [TkDedent, TkEOF]) <$> peekLexeme
+
+-- Comandos -----------------------------------------------------------
 
 -- | Comando ::= ComandoSimples NEWLINE | ComandoComposto
 pStmt :: Parser Stmt
 pStmt = do
-  t <- peek
-  case tokLexeme t of
+  l <- peekLexeme
+  case l of
     TkIf    -> pIf
     TkWhile -> pWhile
     TkFor   -> pFor
-    _      -> pSimpleStmt
+    _       -> pSimpleStmt
 
--- | ComandoIf ::= 'if' Expr ':' Bloco { 'elif' ... } [ 'else' ... ]
+-- | ComandoIf ::= 'if' Expr ':' Bloco { 'elif' Expr ':' Bloco } [ 'else' ':' Bloco ]
 pIf :: Parser Stmt
 pIf = do
-  t <- expect TkIf "if" "comando if"
+  t <- expect TkIf
   cond <- pExpr
-  _ <- expect TkColon ":" "comando if"
+  _ <- expect TkColon
   entao <- pBlock
-  elifs <- many0 (check TkElif) pElif
+  elifs <- while ((== TkElif) <$> peekLexeme) pElif
   senao <- pElse
   pure (SIf (tokPos t) cond entao elifs senao)
 
 pElif :: Parser (Pos, Expr, Block)
 pElif = do
-  t <- expect TkElif "elif" "clausula elif"
+  t <- expect TkElif
   cond <- pExpr
-  _ <- expect TkColon ":" "clausula elif"
+  _ <- expect TkColon
   corpo <- pBlock
   pure (tokPos t, cond, corpo)
 
 pElse :: Parser Block
 pElse = do
-  m <- accept TkElse
-  case m of
-    Nothing -> pure []
-    Just _ -> do
-      _ <- expect TkColon ":" "clausula else"
-      pBlock
+  temElse <- accept TkElse
+  if not temElse then pure [] else expect TkColon >> pBlock
 
+-- | ComandoWhile ::= 'while' Expr ':' Bloco
 pWhile :: Parser Stmt
 pWhile = do
-  t <- expect TkWhile "while" "comando while"
+  t <- expect TkWhile
   cond <- pExpr
-  _ <- expect TkColon ":" "comando while"
-  corpo <- pBlock
-  pure (SWhile (tokPos t) cond corpo)
+  _ <- expect TkColon
+  SWhile (tokPos t) cond <$> pBlock
 
 -- | ComandoFor ::= 'for' IDENT 'in' Expr ':' Bloco
 pFor :: Parser Stmt
 pFor = do
-  t <- expect TkFor "for" "comando for"
-  (_, v) <- expectIdent "comando for"
-  _ <- expect TkIn "in" "comando for"
+  t <- expect TkFor
+  (_, v) <- expectIdent
+  _ <- expect TkIn
   it <- pExpr
-  _ <- expect TkColon ":" "comando for"
-  corpo <- pBlock
-  pure (SFor (tokPos t) v it corpo)
+  _ <- expect TkColon
+  SFor (tokPos t) v it <$> pBlock
 
 -- | ComandoSimples seguido de NEWLINE.
 pSimpleStmt :: Parser Stmt
 pSimpleStmt = do
   s <- pSimple
-  _ <- expect TkNewline "fim de linha" "comando"
+  _ <- expect TkNewline
   pure s
 
 pSimple :: Parser Stmt
 pSimple = do
-  t <- peek
+  t <- peekToken
   let p = tokPos t
   case tokLexeme t of
-    TkPass     -> advance >> pure (SPass p)
-    TkBreak    -> advance >> pure (SBreak p)
-    TkContinue -> advance >> pure (SContinue p)
+    TkPass     -> SPass p <$ advance
+    TkBreak    -> SBreak p <$ advance
+    TkContinue -> SContinue p <$ advance
     TkReturn   -> do
       _ <- advance
-      fim <- check TkNewline
+      fim <- (== TkNewline) <$> peekLexeme
       if fim then pure (SReturn p Nothing) else SReturn p . Just <$> pExpr
     _ -> pAssignOrExpr
 
 -- | Atribuicao ou expressao usada como comando.
 --
--- A declaracao com anotacao, @nome: tipo = expr@, e identificada
--- olhando dois tokens a frente: IDENT seguido de ':'. Nos demais
--- casos reconhece-se uma expressao e, se vier em seguida um operador
--- de atribuicao, a expressao ja construida e convertida em alvo.
+-- A declaracao com anotacao, @nome: tipo = expr@, e reconhecida pelos
+-- dois primeiros tokens: IDENT seguido de ':'. Nos demais casos
+-- reconhece-se uma expressao e, se vier em seguida um operador de
+-- atribuicao, a expressao ja construida e convertida em alvo.
 pAssignOrExpr :: Parser Stmt
 pAssignOrExpr = do
-  ehDecl <- pIsVarDecl
-  if ehDecl then pVarDecl else pAssignTail
-
-pIsVarDecl :: Parser Bool
-pIsVarDecl = do
-  t <- peek
-  case tokLexeme t of
-    TkIdent _ -> do
-      mnext <- peekAt 1
-      pure (fmap tokLexeme mnext == Just TkColon)
-    _ -> pure False
+  (a, b) <- peekTwo
+  if isIdent a && b == TkColon then pVarDecl else pAssignTail
 
 -- | Atribuicao ::= IDENT ':' Tipo '=' Expr
 pVarDecl :: Parser Stmt
 pVarDecl = do
-  (p, nome) <- expectIdent "declaracao de variavel"
-  _ <- expect TkColon ":" "declaracao de variavel"
+  (p, nome) <- expectIdent
+  _ <- expect TkColon
   t <- pType
-  _ <- expect TkAssign "=" "declaracao de variavel"
+  _ <- expect TkAssign
   SVarDecl p nome t <$> pExpr
 
 -- | Expressao seguida, opcionalmente, de '=' ou de um operador
@@ -270,29 +345,26 @@ pVarDecl = do
 pAssignTail :: Parser Stmt
 pAssignTail = do
   e <- pExpr
-  t <- peek
-  case tokLexeme t of
+  l <- peekLexeme
+  case l of
     TkAssign -> do
-      _ <- advance
       alvo <- toLValue e
+      _ <- advance
       SAssign (exprPos e) alvo <$> pExpr
-    lx | Just op <- lookup lx augOps -> do
-      _ <- advance
+    _ | Just op <- lookup l augOps -> do
       alvo <- toLValue e
+      _ <- advance
       SAugAssign (exprPos e) alvo op <$> pExpr
     _ -> pure (SExpr (exprPos e) e)
 
--- | Converte uma expressao ja reconhecida em alvo de atribuicao.
--- Alvos validos sao nome, acesso indexado e acesso a campo
--- (secao 7.2 da especificacao).
+-- | Alvos validos sao nome, acesso indexado e acesso a campo (secao 7.2
+-- da especificacao). O erro aponta a expressao recusada.
 toLValue :: Expr -> Parser LValue
 toLValue e = case e of
-  EVar p n      -> pure (LVar p n)
-  EIndex p b i  -> pure (LIndex p b i)
-  EField p b n  -> pure (LField p b n)
-  -- O erro e reportado na posicao da expressao recusada, e nao na do
-  -- proximo token, porque e ela que nao constitui alvo valido.
-  _ -> failAt (exprPos e) "esta expressao" "um alvo de atribuicao valido" "atribuicao"
+  EVar p n     -> pure (LVar p n)
+  EIndex p b i -> pure (LIndex p b i)
+  EField p b n -> pure (LField p b n)
+  _            -> failAt (exprPos e) "invalid assignment target"
 
 augOps :: [(Lexeme, AugOp)]
 augOps =
@@ -301,37 +373,207 @@ augOps =
   , (TkDSlashEq, FloorDivAssign), (TkPercentEq, ModAssign)
   ]
 
+-- Tipos --------------------------------------------------------------
+
 -- | Tipo ::= TipoFuncao | TipoAtomico
 pType :: Parser Type
 pType = do
-  t <- peek
+  t <- peekToken
   let p = tokPos t
   case tokLexeme t of
-    TkIntKw   -> advance >> pure (TyInt p)
-    TkFloatKw -> advance >> pure (TyFloat p)
-    TkBoolKw  -> advance >> pure (TyBool p)
-    TkStrKw   -> advance >> pure (TyStr p)
-    TkNoneKw  -> advance >> pure (TyNone p)
+    TkIntKw   -> TyInt p <$ advance
+    TkFloatKw -> TyFloat p <$ advance
+    TkBoolKw  -> TyBool p <$ advance
+    TkStrKw   -> TyStr p <$ advance
+    TkNoneKw  -> TyNone p <$ advance
+    -- TipoFuncao ::= '(' [ Tipo { ',' Tipo } ] ')' '->' Tipo
     TkLParen -> do
       _ <- advance
-      args <- pTypeListUntil TkRParen
-      _ <- expect TkRParen ")" "tipo de funcao"
-      _ <- expect TkArrow "->" "tipo de funcao"
+      args <- commaSepUntil TkRParen pType
+      _ <- expect TkRParen
+      _ <- expect TkArrow
       TyFun p args <$> pType
-    TkIdent "list" -> do
+    TkIdent n -> do
       _ <- advance
-      _ <- expect TkLBracket "[" "tipo lista"
-      elemT <- pType
-      _ <- expect TkRBracket "]" "tipo lista"
-      pure (TyList p elemT)
-    -- Identificadores iniciados por maiuscula sao tipos de classe;
-    -- os demais sao variaveis de tipo (secao 3.5).
-    TkIdent n
-      | not (null n) && isUpper (head n) -> advance >> pure (TyClass p n)
-      | otherwise -> advance >> pure (TyVar p n)
-    _ -> failWith "um tipo" "anotacao de tipo"
+      colchete <- peekToken
+      if tokLexeme colchete /= TkLBracket then pure (nameType p n) else do
+        -- So list recebe argumento de tipo: list[T].
+        _ <- advance
+        elemT <- pType
+        _ <- expect TkRBracket
+        if n == "list"
+          then pure (TyList p elemT)
+          else failAt (tokPos colchete) ("unexpected '[' after type '" ++ n ++ "'")
+    _ -> expected "type"
 
-pTypeListUntil :: Lexeme -> Parser [Type]
-pTypeListUntil close = do
-  vazio <- check close
-  if vazio then pure [] else sepBy1 TkComma pType
+-- | Identificadores iniciados por maiuscula sao tipos de classe; os
+-- demais sao variaveis de tipo (secao 3.5).
+nameType :: Pos -> Name -> Type
+nameType p n = case n of
+  (c : _) | isUpper c -> TyClass p n
+  _                   -> TyVar p n
+
+-- Expressoes ---------------------------------------------------------
+
+-- | Expr ::= ExprOu [ 'if' ExprOu 'else' Expr ]
+--
+-- A expressao condicional associa a direita: o ramo else e uma Expr
+-- completa (secao 6.10 da especificacao).
+pExpr :: Parser Expr
+pExpr = do
+  e <- pOr
+  condicional <- accept TkIf
+  if not condicional then pure e else do
+    cond <- pOr
+    _ <- expect TkElse
+    ECond (exprPos e) e cond <$> pExpr
+
+-- | ExprOu ::= ExprE { 'or' ExprE }
+pOr :: Parser Expr
+pOr = chainLeft pAnd [(TkOr, Or)]
+
+-- | ExprE ::= ExprNao { 'and' ExprNao }
+pAnd :: Parser Expr
+pAnd = chainLeft pNot [(TkAnd, And)]
+
+-- | ExprNao ::= 'not' ExprNao | ExprRel
+pNot :: Parser Expr
+pNot = do
+  t <- peekToken
+  case tokLexeme t of
+    TkNot -> advance >> EUnOp (tokPos t) Not <$> pNot
+    _     -> pRel
+
+-- | ExprRel ::= ExprAdit [ OpRel ExprAdit ]
+--
+-- No maximo um operador relacional: a < b < c e erro de sintaxe.
+pRel :: Parser Expr
+pRel = do
+  left <- pAdd
+  l <- peekLexeme
+  case lookup l relOps of
+    Nothing -> pure left
+    Just op -> advance >> EBinOp (exprPos left) op left <$> pAdd
+
+-- | ExprAdit ::= ExprMult { ( '+' | '-' ) ExprMult }
+pAdd :: Parser Expr
+pAdd = chainLeft pMul [(TkPlus, Add), (TkMinus, Sub)]
+
+-- | ExprMult ::= ExprPot { ( '*' | '/' | '//' | '%' ) ExprPot }
+pMul :: Parser Expr
+pMul = chainLeft pPow mulOps
+
+-- | ExprPot ::= ExprUnaria [ '**' ExprPot ]
+--
+-- Recursao a direita no segundo operando: ** associa a direita. Como
+-- os operandos sao ExprUnaria, o menos unario liga mais forte que **
+-- (secao 6.3): -2 ** 2 e (-2) ** 2, e 2 ** -1 e aceito.
+pPow :: Parser Expr
+pPow = do
+  base <- pUnary
+  pot <- accept TkDStar
+  if pot then EBinOp (exprPos base) Pow base <$> pPow else pure base
+
+-- | ExprUnaria ::= '-' ExprUnaria | ExprPosfixa
+pUnary :: Parser Expr
+pUnary = do
+  t <- peekToken
+  case tokLexeme t of
+    TkMinus -> advance >> EUnOp (tokPos t) Neg <$> pUnary
+    _       -> pPostfix
+
+-- | ExprPosfixa ::= Atomo { Posfixo }
+--
+-- Posfixo ::= '(' [ Args ] ')' | '[' Expr ']' | '.' IDENT
+-- A repeticao constroi a arvore associando a esquerda, de modo que
+-- obj.lista[0].campo() seja aninhado na ordem de escrita.
+pPostfix :: Parser Expr
+pPostfix = pAtom >>= go
+  where
+    go acc = do
+      l <- peekLexeme
+      case l of
+        TkLParen -> do
+          _ <- advance
+          args <- commaSepUntil TkRParen pExpr
+          _ <- expect TkRParen
+          go (ECall (exprPos acc) acc args)
+        TkLBracket -> do
+          _ <- advance
+          idx <- pExpr
+          _ <- expect TkRBracket
+          go (EIndex (exprPos acc) acc idx)
+        TkDot -> do
+          _ <- advance
+          (_, n) <- expectIdent
+          go (EField (exprPos acc) acc n)
+        _ -> pure acc
+
+-- | Atomo, conforme a producao de mesmo nome na GLC.
+pAtom :: Parser Expr
+pAtom = do
+  t <- peekToken
+  let p = tokPos t
+  case tokLexeme t of
+    TkIntLit n   -> EInt p n <$ advance
+    TkFloatLit d -> EFloat p d <$ advance
+    TkStrLit s   -> EStr p s <$ advance
+    TkBoolLit b  -> EBool p b <$ advance
+    TkNoneKw     -> ENone p <$ advance
+    TkSelf       -> ESelf p <$ advance
+    TkIdent n    -> EVar p n <$ advance
+    -- int, float, str e bool sao palavras reservadas de tipo e tambem
+    -- funcoes primitivas de conversao (secao 8 da especificacao). Em
+    -- posicao de expressao valem como nome de funcao; a chamada e
+    -- montada pelo nivel posfixo.
+    TkIntKw      -> EVar p "int" <$ advance
+    TkFloatKw    -> EVar p "float" <$ advance
+    TkStrKw      -> EVar p "str" <$ advance
+    TkBoolKw     -> EVar p "bool" <$ advance
+    TkLBracket -> do
+      _ <- advance
+      es <- commaSepUntil TkRBracket pExpr
+      _ <- expect TkRBracket
+      pure (EList p es)
+    -- Parametros de lambda nao tem anotacao e podem faltar, como em
+    -- lambda: 42 (secao 6.11 da especificacao).
+    TkLambda -> do
+      _ <- advance
+      ps <- map snd <$> commaSepUntil TkColon expectIdent
+      _ <- expect TkColon
+      ELambda p ps <$> pExpr
+    TkLParen -> do
+      _ <- advance
+      e <- pExpr
+      _ <- expect TkRParen
+      pure e
+    _ -> expected "expression"
+
+-- | Reconhece uma cadeia associativa a esquerda: proximo { op proximo }.
+chainLeft :: Parser Expr -> [(Lexeme, BinOp)] -> Parser Expr
+chainLeft next ops = next >>= go
+  where
+    go acc = do
+      l <- peekLexeme
+      case lookup l ops of
+        Nothing -> pure acc
+        Just op -> do
+          _ <- advance
+          right <- next
+          go (EBinOp (exprPos acc) op acc right)
+
+isIdent :: Lexeme -> Bool
+isIdent (TkIdent _) = True
+isIdent _           = False
+
+relOps :: [(Lexeme, BinOp)]
+relOps =
+  [ (TkEqEq, Eq), (TkNeq, Neq), (TkLt, Lt)
+  , (TkLe, Le), (TkGt, Gt), (TkGe, Ge)
+  ]
+
+mulOps :: [(Lexeme, BinOp)]
+mulOps =
+  [ (TkStar, Mul), (TkSlash, Div)
+  , (TkDSlash, FloorDiv), (TkPercent, Mod)
+  ]

@@ -11,6 +11,8 @@ import MiniPython.Frontend.Parser.Happy.Grammar (parseProgramLALR)
 import MiniPython.Frontend.Parser.PEG (formatPegError, parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
 import MiniPython.Frontend.Pretty.MiniPythonPretty (toTree)
+import MiniPython.Frontend.Syntax.MiniPythonSyntax (Program)
+import MiniPython.Frontend.Syntax.Validate (validate)
 import MiniPython.Utils.Error (formatError)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -42,13 +44,18 @@ run mode file src = do
     Lex -> mapM_ (putStrLn . renderToken) toks
     ParseRD -> case parseProgram toks of
       Left err  -> abort (formatParseError file err)
-      Right ast -> putStrLn (drawTree (toTree ast))
+      Right ast -> printAst ast
     ParsePEG -> case parseProgramPEG file toks of
       Left bundle -> abort (formatPegError file bundle)
-      Right ast   -> putStrLn (drawTree (toTree ast))
+      Right ast   -> printAst ast
     ParseLALR -> case parseProgramLALR toks of
       Left msg  -> abort (file ++ ":" ++ msg)
-      Right ast -> putStrLn (drawTree (toTree ast))
+      Right ast -> printAst ast
+  where
+    printAst :: Program -> IO ()
+    printAst ast = case validate ast of
+      Left e     -> abort (formatError (takeFileName file) e)
+      Right prog -> putStrLn (drawTree (toTree prog))
 
 -- | Executa o analisador lexico com a camada de indentacao, abortando
 -- com mensagem posicionada em caso de erro. Como nos arquivos .err, a

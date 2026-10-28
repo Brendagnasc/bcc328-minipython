@@ -19,6 +19,7 @@ library
                     , MiniPython.Frontend.Lexer.MiniPythonLexer
                     , MiniPython.Frontend.Lexer.Indent
                     , MiniPython.Frontend.Syntax.MiniPythonSyntax
+                    , MiniPython.Frontend.Syntax.Validate
                     , MiniPython.Frontend.Pretty.MiniPythonPretty
                     , MiniPython.Frontend.Parser.Core
                     , MiniPython.Frontend.Parser.Expr

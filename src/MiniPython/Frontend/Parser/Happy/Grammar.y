@@ -120,10 +120,12 @@ Decls :: { [Decl] }
   : {- vazio -}                     { [] }
   | Decls Decl                      { $2 : $1 }
 
+-- Uma DefFuncao de nivel superior chega aqui como Comando, porque a
+-- funcao local tambem e um comando; declDe a devolve como DFun, como
+-- fazem os outros parsers.
 Decl :: { Decl }
-  : DefFuncao                       { DFun $1 }
-  | DefClasse                       { DClass $1 }
-  | Comando                         { DStmt $1 }
+  : DefClasse                       { DClass $1 }
+  | Comando                         { declDe $1 }
 
 DefFuncao :: { FunDef }
   : 'def' ident ListaParams Retorno ':' Bloco
@@ -187,6 +189,7 @@ Comando :: { Stmt }
   | ComandoIf                       { $1 }
   | 'while' Expr ':' Bloco          { SWhile (tokPos $1) $2 $4 }
   | 'for' ident 'in' Expr ':' Bloco { SFor (tokPos $1) (identName $2) $4 $6 }
+  | DefFuncao                       { SFunDef $1 }
 
 ComandoIf :: { Stmt }
   : 'if' Expr ':' Bloco Elifs Else  { SIf (tokPos $1) $2 $4 (reverse $5) $6 }
@@ -338,6 +341,10 @@ parseError (toks, esperados) =
     operadores =
       [ "'or'", "'and'", "'if'", "'=='", "'!='", "'<'", "'<='", "'>'", "'>='"
       , "'+'", "'-'", "'*'", "'/'", "'//'", "'%'", "'**'", "'('", "'['", "'.'" ]
+
+declDe :: Stmt -> Decl
+declDe (SFunDef fd) = DFun fd
+declDe s            = DStmt s
 
 -- | Parametros repetidos sao recusados no ')' que fecha a lista.
 checkParams :: Token -> [Param] -> Either Error [Param]

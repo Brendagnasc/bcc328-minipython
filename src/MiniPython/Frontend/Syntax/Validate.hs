@@ -35,6 +35,9 @@ stmt inFun inLoop s = case s of
     mapM_ (block inLoop) (thenB : [b | (_, _, b) <- elifs] ++ [elseB])
   SWhile _ _ body   -> block True body
   SFor _ _ _ body   -> block True body
+  -- O corpo de uma funcao local esta dentro de funcao, mas nao herda o
+  -- laco de fora: um break ali nao teria laco para interromper.
+  SFunDef fd        -> mapM_ (stmt True False) (fnBody fd)
   _                 -> Right ()
   where
     block loop = mapM_ (stmt inFun loop)

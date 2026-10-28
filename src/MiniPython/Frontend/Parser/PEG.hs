@@ -259,7 +259,8 @@ mkPostfix = foldl step
   suite     :: R Block   <- eol ind b:body
   body      :: R Block   <- r:(s:|x:stmt| ss:(ind t:|y:stmt|)* { sequence (s : ss) })^>
 
-  stmt      :: R Stmt    <- a:ifstmt / b:whilestmt / c:forstmt / d:simple eol
+  stmt      :: R Stmt    <- f:fundef { fmap SFunDef f }
+                          / a:ifstmt / b:whilestmt / c:forstmt / d:simple eol
 
   ifstmt    :: R Stmt    <- p:@ "if" ![a-zA-Z0-9_] sp c:expr ':' sp b:suite
                             es:elifcl* e:elsecl?       { mkIf src p c b es e }

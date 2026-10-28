@@ -104,6 +104,10 @@ data Stmt
   | SPass Pos
   -- | Expressao usada como comando, tipicamente uma chamada.
   | SExpr Pos Expr
+  -- | Funcao local, definida dentro de um bloco (regra 19 da secao 10).
+  -- As de nivel superior ficam em DFun, porque so elas sao
+  -- generalizadas na inferencia de tipos.
+  | SFunDef FunDef
   deriving (Eq)
 
 -- | Alvo de uma atribuicao.
@@ -199,6 +203,7 @@ stmtPos s = case s of
   SContinue p         -> p
   SPass p             -> p
   SExpr p _           -> p
+  SFunDef fd          -> fnPos fd
 
 lvaluePos :: LValue -> Pos
 lvaluePos lv = case lv of

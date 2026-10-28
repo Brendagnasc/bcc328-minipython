@@ -135,7 +135,10 @@ pProgram = Program <$> go
       l <- peekLexeme
       if l == TkEOF then [] <$ advance else (:) <$> pDecl <*> go
 
--- | Decl ::= DefFuncao | DefClasse | Comando
+-- | Decl ::= DefClasse | Comando
+--
+-- Uma DefFuncao de nivel superior, que a GLC deriva por Comando, vira
+-- DFun na AST; dentro de um bloco ela vira o comando SFunDef.
 pDecl :: Parser Decl
 pDecl = do
   l <- peekLexeme
@@ -247,7 +250,7 @@ pBlock = do
 
 -- Comandos -----------------------------------------------------------
 
--- | Comando ::= ComandoSimples NEWLINE | ComandoComposto
+-- | Comando ::= ComandoSimples NEWLINE | ComandoComposto | DefFuncao
 pStmt :: Parser Stmt
 pStmt = do
   l <- peekLexeme
@@ -255,6 +258,7 @@ pStmt = do
     TkIf    -> pIf
     TkWhile -> pWhile
     TkFor   -> pFor
+    TkDef   -> SFunDef <$> pFunDef
     _       -> pSimpleStmt
 
 -- | ComandoIf ::= 'if' Expr ':' Bloco { 'elif' Expr ':' Bloco } [ 'else' ':' Bloco ]

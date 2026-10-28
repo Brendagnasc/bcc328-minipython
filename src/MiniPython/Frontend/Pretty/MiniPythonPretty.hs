@@ -62,6 +62,7 @@ stmtTree s = case s of
   SContinue _ -> leaf "SContinue"
   SPass _     -> leaf "SPass"
   SExpr _ e   -> Node "SExpr" [exprTree e]
+  SFunDef fd  -> funTree fd
   where
     elifTree (_, c, b) = Node "elif" [exprTree c, block "then" b]
     elseTree [] = []

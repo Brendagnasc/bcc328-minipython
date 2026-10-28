@@ -1,0 +1,13 @@
+def soma_quadrados(xs: list[int]) -> int:
+    def quadrado(x: int) -> int:
+        return x * x
+    total: int = 0
+    for x in xs:
+        total += quadrado(x)
+    return total
+
+def main() -> None:
+    incrementa: (int) -> int = lambda x: x + 1
+    print(str(incrementa(soma_quadrados([1, 2, 3]))))
+
+main()

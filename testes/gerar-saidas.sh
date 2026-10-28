@@ -19,7 +19,7 @@ saida="testes/saidas-esperadas.txt"
   echo
 } >> "$saida"
 
-for f in mdc fib busca selecao alta_ordem formas pilha lambdas continuacao; do
+for f in mdc fib busca selecao alta_ordem formas pilha lambdas continuacao funcao_local; do
   {
     echo "===================================================================="
     echo "exemplos/$f.mpy  (--parse-rd, --parse-peg e --parse-lalr)"
@@ -36,7 +36,8 @@ done
   echo
 } >> "$saida"
 
-for f in erro_char erro_string erro_indent erro_sem_colon erro_if_colon erro_alvo erro_rel; do
+for f in erro_char erro_string erro_separador erro_expoente erro_indent erro_sem_colon \
+         erro_if_colon erro_alvo erro_rel erro_condicional erro_lambda_operando erro_break_local; do
   {
     echo "-- exemplos/$f.mpy"
     for modo in --parse-rd --parse-peg --parse-lalr; do

@@ -1244,6 +1244,91 @@ Program
          `- EVar b
 
 ====================================================================
+exemplos/funcao_local.mpy  (--parse-rd, --parse-peg e --parse-lalr)
+====================================================================
+Program
+|
++- FunDef soma_quadrados(xs: list[int]) -> int
+|  |
+|  +- FunDef quadrado(x: int) -> int
+|  |  |
+|  |  `- SReturn
+|  |     |
+|  |     `- EBinOp Mul
+|  |        |
+|  |        +- EVar x
+|  |        |
+|  |        `- EVar x
+|  |
+|  +- SVarDecl total: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  +- SFor x
+|  |  |
+|  |  +- EVar xs
+|  |  |
+|  |  `- body
+|  |     |
+|  |     `- SAugAssign AddAssign
+|  |        |
+|  |        +- LVar total
+|  |        |
+|  |        `- ECall
+|  |           |
+|  |           +- EVar quadrado
+|  |           |
+|  |           `- EVar x
+|  |
+|  `- SReturn
+|     |
+|     `- EVar total
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl incrementa: (int) -> int
+|  |  |
+|  |  `- ELambda x
+|  |     |
+|  |     `- EBinOp Add
+|  |        |
+|  |        +- EVar x
+|  |        |
+|  |        `- EInt 1
+|  |
+|  `- SExpr
+|     |
+|     `- ECall
+|        |
+|        +- EVar print
+|        |
+|        `- ECall
+|           |
+|           +- EVar str
+|           |
+|           `- ECall
+|              |
+|              +- EVar incrementa
+|              |
+|              `- ECall
+|                 |
+|                 +- EVar soma_quadrados
+|                 |
+|                 `- EList
+|                    |
+|                    +- EInt 1
+|                    |
+|                    +- EInt 2
+|                    |
+|                    `- EInt 3
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
+
+====================================================================
 Programas invalidos: mensagem de erro de cada analisador
 (a mesma do arquivo .err ao lado do programa)
 ====================================================================
@@ -1257,6 +1342,16 @@ Programas invalidos: mensagem de erro de cada analisador
    --parse-rd    erro_string.mpy:1:5: error: string não terminada
    --parse-peg   erro_string.mpy:1:5: error: string não terminada
    --parse-lalr  erro_string.mpy:1:5: error: string não terminada
+
+-- exemplos/erro_separador.mpy
+   --parse-rd    erro_separador.mpy:1:10: error: literal inteiro mal formado: '1__000'
+   --parse-peg   erro_separador.mpy:1:10: error: literal inteiro mal formado: '1__000'
+   --parse-lalr  erro_separador.mpy:1:10: error: literal inteiro mal formado: '1__000'
+
+-- exemplos/erro_expoente.mpy
+   --parse-rd    erro_expoente.mpy:1:12: error: literal float mal formado: '1e+'
+   --parse-peg   erro_expoente.mpy:1:12: error: literal float mal formado: '1e+'
+   --parse-lalr  erro_expoente.mpy:1:12: error: literal float mal formado: '1e+'
 
 -- exemplos/erro_indent.mpy
    --parse-rd    erro_indent.mpy:3:14: error: nível de indentação inválido: 6 não está na pilha de indentação
@@ -1282,4 +1377,19 @@ Programas invalidos: mensagem de erro de cada analisador
    --parse-rd    erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
    --parse-peg   erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
    --parse-lalr  erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
+
+-- exemplos/erro_condicional.mpy
+   --parse-rd    erro_condicional.mpy:1:17: error: expected 'else', got 'if'
+   --parse-peg   erro_condicional.mpy:1:17: error: expected 'else', got 'if'
+   --parse-lalr  erro_condicional.mpy:1:17: error: expected 'else', got 'if'
+
+-- exemplos/erro_lambda_operando.mpy
+   --parse-rd    erro_lambda_operando.mpy:1:23: error: expected expression, got 'lambda'
+   --parse-peg   erro_lambda_operando.mpy:1:23: error: expected expression, got 'lambda'
+   --parse-lalr  erro_lambda_operando.mpy:1:23: error: expected expression, got 'lambda'
+
+-- exemplos/erro_break_local.mpy
+   --parse-rd    erro_break_local.mpy:4:13: error: 'break' outside a loop
+   --parse-peg   erro_break_local.mpy:4:13: error: 'break' outside a loop
+   --parse-lalr  erro_break_local.mpy:4:13: error: 'break' outside a loop
 

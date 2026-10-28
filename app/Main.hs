@@ -7,7 +7,7 @@ import MiniPython.Frontend.Lexer.Indent (layout)
 import MiniPython.Frontend.Lexer.MiniPythonLexer (renderToken, scan)
 import MiniPython.Frontend.Lexer.Token (Token)
 import MiniPython.Frontend.Parser.Happy.Grammar (parseProgramLALR)
-import MiniPython.Frontend.Parser.PEG (formatPegError, parseProgramPEG)
+import MiniPython.Frontend.Parser.PEG (parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
 import MiniPython.Frontend.Pretty.MiniPythonPretty (toTree)
 import MiniPython.Frontend.Syntax.MiniPythonSyntax (Program)
@@ -42,9 +42,7 @@ run mode file src = do
   case mode of
     Lex -> mapM_ (putStrLn . renderToken) toks
     ParseRD -> printAst (parseProgram toks)
-    ParsePEG -> case parseProgramPEG file toks of
-      Left bundle -> abort (formatPegError file bundle)
-      Right ast   -> printAst (Right ast)
+    ParsePEG -> printAst (parseProgramPEG src toks)
     ParseLALR -> case parseProgramLALR toks of
       Left msg  -> abort (file ++ ":" ++ msg)
       Right ast -> printAst (Right ast)

@@ -1,390 +1,425 @@
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
--- | Analisador sintatico baseado em PEG, implementado com Megaparsec.
+{-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE QuasiQuotes     #-}
+{-# LANGUAGE TemplateHaskell #-}
+-- | Analisador sintatico baseado em PEG, escrito com a typed-peg.
 --
--- Reconhece exatamente a mesma linguagem da GLC proposta em
--- docs/gramatica.md e produz a mesma AST do analisador descendente
--- recursivo, de modo que as fases posteriores do compilador nao
--- dependem da estrategia de analise.
+-- A typed-peg le caracteres, e nao tokens, entao esta gramatica cuida
+-- tambem da parte lexica e da indentacao. A linguagem e a AST, com as
+-- posicoes, sao as mesmas dos outros dois parsers; o porque das regras
+-- de layout e dos %label esta em docs/gramatica.md.
 --
--- Diferenca essencial em relacao ao descendente recursivo: a escolha
--- em PEG e ordenada. Em @a <|> b@, b so e tentado se a falhar sem
--- consumir entrada; quando a alternativa pode consumir tokens antes
--- de falhar, e necessario envolve-la em try.
+-- Em resumo: um bloco e e^> com cada comando alinhado (|e|), como no
+-- exemplo Layout da disciplina; a relacao entre tokens e gtR, de modo
+-- que a quebra de linha so vira espaco dentro de parenteses e
+-- colchetes, onde vale _~; e os %label com nome vazio escondem o espaco
+-- e o primeiro token das continuacoes opcionais, para que a lista de
+-- esperados de um erro tenha so o que de fato faltou.
+--
+-- As regras de comando devolvem Either Error porque tres restricoes so
+-- podem ser verificadas na acao semantica, que nao faz o parse falhar:
+-- alvo de atribuicao, parametro repetido e argumento de tipo.
 module MiniPython.Frontend.Parser.PEG
   ( parseProgramPEG
-  , pegErrorPos
-  , formatPegError
   ) where
 
-import Control.Monad (void)
-import Control.Monad.Combinators (many, sepBy, (<|>))
 import Data.Char (isUpper)
-import qualified Data.List.NonEmpty as NE
-import Data.Void (Void)
-import qualified MiniPython.Frontend.Lexer.Token as L
-import MiniPython.Frontend.Parser.Stream
+import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
+import MiniPython.Frontend.Lexer.Token
 import MiniPython.Frontend.Syntax.MiniPythonSyntax
-import Text.Megaparsec hiding (Token, many, sepBy, (<|>))
+import MiniPython.Frontend.Syntax.Validate (duplicateParam)
+import MiniPython.Utils.Error
+import PEG hiding (Name, Not)
+import PEG.QQ (pegGrammar)
 
--- | Reconhece um programa completo a partir da lista de tokens.
-parseProgramPEG :: FilePath -> [L.Token] -> Either (ParseErrorBundle TokenStream Void) Program
-parseProgramPEG file toks = runParser (pProgram <* eof') file (toStream toks)
+type R = Either Error
 
--- | Posicao mais a direita em que o reconhecimento falhou, conforme
--- exigido na secao 4 do enunciado. O Megaparsec ja reporta o erro na
--- maior posicao alcancada entre todas as alternativas tentadas.
-pegErrorPos :: ParseErrorBundle TokenStream Void -> L.Pos
-pegErrorPos bundle = posFromSourcePos (pstateSourcePos estado)
+-- | Linhas do fonte indexadas pelo deslocamento do primeiro caractere.
+-- A typed-peg entrega deslocamentos; a conversao para linha e coluna
+-- segue o lexer, com tabulacao ate a proxima coluna multipla de 8.
+newtype Source = Source (Map.Map Int (Int, String))
+
+source :: String -> Source
+source txt = Source (Map.fromList (zip starts (zip [1 ..] ls)))
   where
-    erro = NE.head (bundleErrors bundle)
-    (_, estado) = reachOffset (errorOffset erro) (bundlePosState bundle)
+    ls = splitLines txt
+    starts = scanl (\o l -> o + length l + 1) 0 ls
+    splitLines s = case break (== '\n') s of
+      (l, [])       -> [l]
+      (l, _ : rest) -> l : splitLines rest
 
--- | Formata o erro do PEG no mesmo padrao dos demais analisadores.
--- O Megaparsec relata a falha na maior posicao alcancada entre todas
--- as alternativas tentadas, que e a posicao mais a direita exigida
--- pela secao 4 do enunciado.
-formatPegError :: FilePath -> ParseErrorBundle TokenStream Void -> String
-formatPegError file bundle =
-  file
-    ++ ":" ++ show (L.posLine p)
-    ++ ":" ++ show (L.posCol p)
-    ++ ": erro sintatico: " ++ detalhe
+posAt :: Source -> Int -> Pos
+posAt (Source m) off = case Map.lookupLE off m of
+  Just (start, (ln, txt)) -> Pos ln (foldl step 1 (take (off - start) txt))
+  Nothing                 -> initialPos
   where
-    p = pegErrorPos bundle
-    erro = NE.head (bundleErrors bundle)
-    detalhe = unwords (lines (parseErrorTextPretty erro))
+    step c '\t' = ((c - 1) `div` 8 + 1) * 8 + 1
+    step c _    = c + 1
 
--- Consome o token EOF produzido pelo lexer e entao o fim do fluxo.
-eof' :: PegParser ()
-eof' = void (satisfyLex (== L.TkEOF)) >> eof
+-- Construcao da AST a partir das acoes ----------------------------------
 
--- | Consome um token cujo lexema satisfaz o predicado.
-satisfyLex :: (L.Lexeme -> Bool) -> PegParser L.Token
-satisfyLex f = satisfy (f . L.tokLexeme)
+mkProgram :: [R Decl] -> R Program
+mkProgram ds = Program <$> sequence ds
 
--- | Consome um lexema especifico.
-tok :: L.Lexeme -> PegParser L.Token
-tok lx = satisfyLex (== lx)
+mkFunDef :: Source -> Int -> Name -> ([R Param], Int) -> Maybe (R Type) -> R Block -> R FunDef
+mkFunDef src p n (rps, fecha) ret body = do
+  ps <- sequence rps
+  case duplicateParam ps of
+    Just d  -> Left (Error (posAt src fecha) ("duplicate parameter: '" ++ d ++ "'"))
+    Nothing -> FunDef (posAt src p) n ps <$> sequence ret <*> body
 
--- | Consome um lexema descartando o resultado.
-tok_ :: L.Lexeme -> PegParser ()
-tok_ = void . tok
+mkParam :: Source -> Int -> Name -> Maybe (R Type) -> R Param
+mkParam src p n t = Param (posAt src p) n <$> sequence t
 
--- | Consome um identificador, devolvendo posicao e nome.
-ident :: PegParser (L.Pos, Name)
-ident = do
-  t <- satisfyLex isIdent
-  case L.tokLexeme t of
-    L.TkIdent n -> pure (L.tokPos t, n)
-    _          -> fail "identificador"
+mkClassDef :: Source -> Int -> Name -> Maybe Name -> R ([Field], [FunDef]) -> R ClassDef
+mkClassDef src p n super body = do
+  (fs, ms) <- body
+  pure (ClassDef (posAt src p) n super fs ms)
+
+mkMembers :: [R Field] -> [R FunDef] -> R ([Field], [FunDef])
+mkMembers fs ms = (,) <$> sequence fs <*> sequence ms
+
+mkField :: Source -> Int -> Name -> R Type -> R Field
+mkField src p n t = Field (posAt src p) n <$> t
+
+mkIf :: Source -> Int -> Expr -> R Block -> [(Int, Expr, R Block)] -> Maybe (R Block) -> R Stmt
+mkIf src p c thenB elifs elseB =
+  SIf (posAt src p) c <$> thenB <*> mapM elif elifs <*> fromMaybe (Right []) elseB
   where
-    isIdent (L.TkIdent _) = True
-    isIdent _            = False
+    elif (q, ec, eb) = (,,) (posAt src q) ec <$> eb
 
--- Programa ::= { Decl } EOF
-pProgram :: PegParser Program
-pProgram = Program <$> many pDecl
+mkVarDecl :: Source -> Int -> Name -> R Type -> Expr -> R Stmt
+mkVarDecl src p n t e = (\ty -> SVarDecl (posAt src p) n ty e) <$> t
 
--- Decl ::= DefFuncao / DefClasse / Comando
-pDecl :: PegParser Decl
-pDecl = choice
-  [ DFun <$> pFunDef
-  , DClass <$> pClassDef
-  , DStmt <$> pStmt
-  ]
+-- | Expressao seguida, ou nao, de '=' ou de um operador aumentado.
+mkAssign :: Expr -> Maybe (Maybe AugOp, Expr) -> R Stmt
+mkAssign e rest = case rest of
+  Nothing              -> Right (SExpr (exprPos e) e)
+  Just (Nothing, v)    -> (\lv -> SAssign (exprPos e) lv v) <$> toLValue e
+  Just (Just op, v)    -> (\lv -> SAugAssign (exprPos e) lv op v) <$> toLValue e
 
--- DefFuncao ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
-pFunDef :: PegParser FunDef
-pFunDef = do
-  t <- tok L.TkDef
-  (_, nome) <- ident
-  ps <- between (tok_ L.TkLParen) (tok_ L.TkRParen) (pParam `sepBy` tok_ L.TkComma)
-  ret <- optional (tok_ L.TkArrow *> pType)
-  tok_ L.TkColon
-  FunDef (L.tokPos t) nome ps ret <$> pBlock
-
-pParam :: PegParser Param
-pParam = pSelfParam <|> pNamedParam
-  where
-    pSelfParam = do
-      t <- tok L.TkSelf
-      pure (Param (L.tokPos t) "self" Nothing)
-    pNamedParam = do
-      (p, nome) <- ident
-      anot <- optional (tok_ L.TkColon *> pType)
-      pure (Param p nome anot)
-
--- DefClasse ::= 'class' IDENT [ '(' IDENT ')' ] ':' BlocoClasse
-pClassDef :: PegParser ClassDef
-pClassDef = do
-  t <- tok L.TkClass
-  (_, nome) <- ident
-  super <- optional (between (tok_ L.TkLParen) (tok_ L.TkRParen) (snd <$> ident))
-  tok_ L.TkColon
-  tok_ L.TkNewline
-  tok_ L.TkIndent
-  campos <- many (try pField)
-  metodos <- many pFunDef
-  _ <- optional (tok_ L.TkPass *> tok_ L.TkNewline)
-  tok_ L.TkDedent
-  pure (ClassDef (L.tokPos t) nome super campos metodos)
-
--- Campo ::= IDENT ':' Tipo NEWLINE
---
--- Envolvido em try no ponto de uso: um campo e um metodo nao se
--- distinguem pelo primeiro token quando o corpo da classe comeca
--- por um comando.
-pField :: PegParser Field
-pField = do
-  (p, nome) <- ident
-  tok_ L.TkColon
-  t <- pType
-  tok_ L.TkNewline
-  pure (Field p nome t)
-
--- Bloco ::= NEWLINE INDENT Comando { Comando } DEDENT
-pBlock :: PegParser Block
-pBlock = do
-  tok_ L.TkNewline
-  between (tok_ L.TkIndent) (tok_ L.TkDedent) (some' pStmt)
-  where
-    some' p = (:) <$> p <*> many p
-
--- Comando ::= ComandoSimples NEWLINE / ComandoComposto
-pStmt :: PegParser Stmt
-pStmt = choice [pIf, pWhile, pFor, pSimpleStmt]
-
-pIf :: PegParser Stmt
-pIf = do
-  t <- tok L.TkIf
-  cond <- pExpr
-  tok_ L.TkColon
-  entao <- pBlock
-  elifs <- many pElif
-  senao <- option [] (tok_ L.TkElse *> tok_ L.TkColon *> pBlock)
-  pure (SIf (L.tokPos t) cond entao elifs senao)
-
-pElif :: PegParser (L.Pos, Expr, Block)
-pElif = do
-  t <- tok L.TkElif
-  cond <- pExpr
-  tok_ L.TkColon
-  corpo <- pBlock
-  pure (L.tokPos t, cond, corpo)
-
-pWhile :: PegParser Stmt
-pWhile = do
-  t <- tok L.TkWhile
-  cond <- pExpr
-  tok_ L.TkColon
-  SWhile (L.tokPos t) cond <$> pBlock
-
-pFor :: PegParser Stmt
-pFor = do
-  t <- tok L.TkFor
-  (_, v) <- ident
-  tok_ L.TkIn
-  it <- pExpr
-  tok_ L.TkColon
-  SFor (L.tokPos t) v it <$> pBlock
-
-pSimpleStmt :: PegParser Stmt
-pSimpleStmt = pSimple <* tok_ L.TkNewline
-
-pSimple :: PegParser Stmt
-pSimple = choice
-  [ SPass . L.tokPos <$> tok L.TkPass
-  , SBreak . L.tokPos <$> tok L.TkBreak
-  , SContinue . L.tokPos <$> tok L.TkContinue
-  , pReturn
-  , try pVarDecl
-  , pAssignOrExpr
-  ]
-
-pReturn :: PegParser Stmt
-pReturn = do
-  t <- tok L.TkReturn
-  e <- optional pExpr
-  pure (SReturn (L.tokPos t) e)
-
--- Atribuicao ::= IDENT ':' Tipo '=' Expr
---
--- Precisa de try: compartilha o prefixo IDENT com a atribuicao comum
--- e so se distingue no segundo token.
-pVarDecl :: PegParser Stmt
-pVarDecl = do
-  (p, nome) <- ident
-  tok_ L.TkColon
-  t <- pType
-  tok_ L.TkAssign
-  SVarDecl p nome t <$> pExpr
-
--- Reconhece uma expressao e, se vier em seguida um operador de
--- atribuicao, converte a expressao ja construida em alvo. Mesma
--- estrategia do analisador descendente recursivo.
-pAssignOrExpr :: PegParser Stmt
-pAssignOrExpr = do
-  e <- pExpr
-  mop <- optional (choice (map opParser augOps) <|> (Nothing <$ tok L.TkAssign))
-  case mop of
-    Nothing -> pure (SExpr (exprPos e) e)
-    Just Nothing -> do
-      alvo <- toLValue e
-      SAssign (exprPos e) alvo <$> pExpr
-    Just (Just op) -> do
-      alvo <- toLValue e
-      SAugAssign (exprPos e) alvo op <$> pExpr
-  where
-    opParser (lx, op) = Just op <$ tok lx
-
-toLValue :: Expr -> PegParser LValue
+toLValue :: Expr -> R LValue
 toLValue e = case e of
-  EVar p n     -> pure (LVar p n)
-  EIndex p b i -> pure (LIndex p b i)
-  EField p b n -> pure (LField p b n)
-  _            -> fail "alvo de atribuicao valido"
+  EVar p n     -> Right (LVar p n)
+  EIndex p b i -> Right (LIndex p b i)
+  EField p b n -> Right (LField p b n)
+  _            -> Left (Error (exprPos e) "invalid assignment target")
 
-augOps :: [(L.Lexeme, AugOp)]
-augOps =
-  [ (L.TkPlusEq, AddAssign), (L.TkMinusEq, SubAssign)
-  , (L.TkStarEq, MulAssign), (L.TkSlashEq, DivAssign)
-  , (L.TkDSlashEq, FloorDivAssign), (L.TkPercentEq, ModAssign)
-  ]
+mkFunType :: Source -> Int -> [R Type] -> R Type -> R Type
+mkFunType src p ts r = TyFun (posAt src p) <$> sequence ts <*> r
 
--- Tipos
-pType :: PegParser Type
-pType = choice
-  [ TyInt . L.tokPos <$> tok L.TkIntKw
-  , TyFloat . L.tokPos <$> tok L.TkFloatKw
-  , TyBool . L.tokPos <$> tok L.TkBoolKw
-  , TyStr . L.tokPos <$> tok L.TkStrKw
-  , TyNone . L.tokPos <$> tok L.TkNoneKw
-  , pTyFun
-  , pTyListOrName
-  ]
+-- | Nome de tipo, ou list[T]: so list recebe argumento entre colchetes.
+mkNamedType :: Source -> Int -> Name -> Maybe (Int, R Type) -> R Type
+mkNamedType src p n arg = case arg of
+  Nothing -> Right (case n of
+    (c : _) | isUpper c -> TyClass (posAt src p) n
+    _                   -> TyVar (posAt src p) n)
+  Just (q, rt) -> do
+    t <- rt
+    if n == "list"
+      then Right (TyList (posAt src p) t)
+      else Left (Error (posAt src q) ("unexpected '[' after type '" ++ n ++ "'"))
 
-pTyFun :: PegParser Type
-pTyFun = do
-  t <- tok L.TkLParen
-  args <- pType `sepBy` tok_ L.TkComma
-  tok_ L.TkRParen
-  tok_ L.TkArrow
-  TyFun (L.tokPos t) args <$> pType
-
-pTyListOrName :: PegParser Type
-pTyListOrName = do
-  (p, n) <- ident
-  if n == "list"
-    then TyList p <$> between (tok_ L.TkLBracket) (tok_ L.TkRBracket) pType
-    else pure (if not (null n) && isUpper (head n) then TyClass p n else TyVar p n)
-
--- Expressoes, estratificadas como na GLC.
-pExpr :: PegParser Expr
-pExpr = do
-  e <- pOr
-  mc <- optional (tok_ L.TkIf *> ((,) <$> pOr <*> (tok_ L.TkElse *> pExpr)))
-  pure $ case mc of
-    Nothing          -> e
-    Just (cond, alt) -> ECond (exprPos e) e cond alt
-
-pOr :: PegParser Expr
-pOr = chainl1 pAnd [(L.TkOr, Or)]
-
-pAnd :: PegParser Expr
-pAnd = chainl1 pNot [(L.TkAnd, And)]
-
-pNot :: PegParser Expr
-pNot = (do t <- tok L.TkNot; EUnOp (L.tokPos t) Not <$> pNot) <|> pRel
-
-pRel :: PegParser Expr
-pRel = do
-  left <- pAdd
-  mop <- optional (choice [ op <$ tok lx | (lx, op) <- relOps ])
-  case mop of
-    Nothing -> pure left
-    Just op -> EBinOp (exprPos left) op left <$> pAdd
-
-pAdd :: PegParser Expr
-pAdd = chainl1 pMul [(L.TkPlus, Add), (L.TkMinus, Sub)]
-
-pMul :: PegParser Expr
-pMul = chainl1 pUnary mulOps
-
-pUnary :: PegParser Expr
-pUnary = (do t <- tok L.TkMinus; EUnOp (L.tokPos t) Neg <$> pUnary) <|> pPow
-
-pPow :: PegParser Expr
-pPow = do
-  base <- pPostfix
-  mp <- optional (tok_ L.TkDStar *> pPow)
-  pure $ case mp of
-    Nothing -> base
-    Just e  -> EBinOp (exprPos base) Pow base e
-
-pPostfix :: PegParser Expr
-pPostfix = pAtom >>= go
+mkNumber :: Source -> Int -> String -> Maybe String -> Maybe String -> Expr
+mkNumber src p i f x = case (f, x) of
+  (Nothing, Nothing) -> EInt (posAt src p) (read texto)
+  _                  -> EFloat (posAt src p) (read texto)
   where
-    go acc = choice
-      [ do args <- between (tok_ L.TkLParen) (tok_ L.TkRParen) (pExpr `sepBy` tok_ L.TkComma)
-           go (ECall (exprPos acc) acc args)
-      , do idx <- between (tok_ L.TkLBracket) (tok_ L.TkRBracket) pExpr
-           go (EIndex (exprPos acc) acc idx)
-      , do tok_ L.TkDot
-           (_, n) <- ident
-           go (EField (exprPos acc) acc n)
-      , pure acc
-      ]
+    texto = filter (/= '_') (i ++ fromMaybe "" f ++ fromMaybe "" x)
 
-pAtom :: PegParser Expr
-pAtom = do
-  t <- lookAhead anySingle
-  let p = L.tokPos t
-  case L.tokLexeme t of
-    L.TkIntLit n    -> anySingle >> pure (EInt p n)
-    L.TkFloatLit d  -> anySingle >> pure (EFloat p d)
-    L.TkStrLit s -> anySingle >> pure (EStr p s)
-    L.TkBoolLit b   -> anySingle >> pure (EBool p b)
-    L.TkNoneKw        -> anySingle >> pure (ENone p)
-    L.TkSelf        -> anySingle >> pure (ESelf p)
-    L.TkIdent n     -> anySingle >> pure (EVar p n)
-    L.TkIntKw         -> anySingle >> pure (EVar p "int")
-    L.TkFloatKw       -> anySingle >> pure (EVar p "float")
-    L.TkStrKw         -> anySingle >> pure (EVar p "str")
-    L.TkBoolKw        -> anySingle >> pure (EVar p "bool")
-    L.TkLBracket    -> do
-      _ <- anySingle
-      es <- pExpr `sepBy` tok_ L.TkComma
-      tok_ L.TkRBracket
-      pure (EList p es)
-    L.TkLambda -> do
-      _ <- anySingle
-      ps <- (snd <$> ident) `sepBy` tok_ L.TkComma
-      tok_ L.TkColon
-      ELambda p ps <$> pExpr
-    L.TkLParen -> do
-      _ <- anySingle
-      e <- pExpr
-      tok_ L.TkRParen
-      pure e
-    _ -> fail "expressao"
+mkCond :: Expr -> Maybe (Expr, Expr) -> Expr
+mkCond e Nothing       = e
+mkCond e (Just (c, a)) = ECond (exprPos e) e c a
 
--- Cadeia associativa a esquerda.
-chainl1 :: PegParser Expr -> [(L.Lexeme, BinOp)] -> PegParser Expr
-chainl1 next ops = next >>= go
+mkRel :: Expr -> Maybe (BinOp, Expr) -> Expr
+mkRel e Nothing        = e
+mkRel e (Just (op, r)) = EBinOp (exprPos e) op e r
+
+mkPow :: Expr -> Maybe Expr -> Expr
+mkPow b Nothing  = b
+mkPow b (Just e) = EBinOp (exprPos b) Pow b e
+
+-- | Cadeia associativa a esquerda.
+chain :: Expr -> [(BinOp, Expr)] -> Expr
+chain = foldl (\acc (op, r) -> EBinOp (exprPos acc) op acc r)
+
+chainOf :: BinOp -> Expr -> [Expr] -> Expr
+chainOf op e es = chain e [(op, r) | r <- es]
+
+data Postfix
+  = PCall [Expr]
+  | PIndex Expr
+  | PField Name
+
+mkPostfix :: Expr -> [Postfix] -> Expr
+mkPostfix = foldl step
   where
-    go acc = (do
-      op <- choice [ o <$ tok lx | (lx, o) <- ops ]
-      right <- next
-      go (EBinOp (exprPos acc) op acc right)) <|> pure acc
+    step e (PCall args) = ECall (exprPos e) e args
+    step e (PIndex i)   = EIndex (exprPos e) e i
+    step e (PField n)   = EField (exprPos e) e n
 
-relOps :: [(L.Lexeme, BinOp)]
-relOps =
-  [ (L.TkEqEq, Eq), (L.TkNeq, Neq), (L.TkLt, Lt)
-  , (L.TkLe, Le), (L.TkGt, Gt), (L.TkGe, Ge)
-  ]
+[pegGrammar|
+  %name   miniPython
+  %stream String
+  %param  src :: Source
+  %start  program
 
-mulOps :: [(L.Lexeme, BinOp)]
-mulOps =
-  [ (L.TkStar, Mul), (L.TkSlash, Div)
-  , (L.TkDSlash, FloorDiv), (L.TkPercent, Mod)
-  ]
+  %label  hs         ""
+  %label  sp         ""
+  %label  ind        ""
+  %label  blanks     ""
+  %label  nametail   ""
+  %label  number     ""
+  %label  string     ""
+  %label  comma      ""
+  %label  arrow      ""
+  %label  colon      ""
+  %label  superopen  ""
+  %label  passkw     ""
+  %label  elifkw     ""
+  %label  elsekw     ""
+  %label  assignop   ""
+  %label  typeopen   ""
+  %label  condkw     ""
+  %label  orkw       ""
+  %label  andkw      ""
+  %label  relop      ""
+  %label  addop      ""
+  %label  mulop      ""
+  %label  powkw      ""
+  %label  lpar       ""
+  %label  lbrk       ""
+  %label  dot        ""
+  %label  eol        "NEWLINE"
+  %label  body       "INDENT (indented block)"
+  %label  classbody  "INDENT (indented block)"
+  %label  name       "identifier"
+  %label  typ        "type"
+  %label  stmt       "expression"
+  %label  expr       "expression"
+  %label  disj       "expression"
+  %label  conj       "expression"
+  %label  neg        "expression"
+  %label  rel        "expression"
+  %label  sum        "expression"
+  %label  term       "expression"
+  %label  power      "expression"
+  %label  unary      "expression"
+  %label  atom       "expression"
+
+  program   :: R Program <- blanks ds:(ind d:|x:decl|)* end     { mkProgram ds }
+
+  # O fim do arquivo tambem passa pela relacao de coluna: sob gtR o
+  # primeiro caractere de uma linha nunca e aceito, e !. passaria no
+  # meio do arquivo. Por isso o teste e feito com _~.
+  end       :: ()        <- (hs !.)_~
+
+  decl      :: R Decl    <- f:fundef    { fmap DFun f }
+                          / c:classdef  { fmap DClass c }
+                          / s:stmt      { fmap DStmt s }
+
+  # Espaco, quebras de linha e indentacao.
+  hs        :: ()        <- ([ \t\r] / '#' [^\n]*)*
+  sp        :: ()        <- ([ \t\r] / '#' [^\n]* / &('\n' .) '\n')*
+  eol       :: ()        <- (hs ('\n' / !.) blanks)_~
+  blanks    :: ()        <- (hs '\n')*_~
+  ind       :: ()        <- [ \t]*_~
+
+  # Definicoes.
+  fundef    :: R FunDef  <- p:@ "def" ![a-zA-Z0-9_] sp n:name '('
+                            ps:(sp xs:params q:@ ')')_~ sp r:ret? ':' sp b:suite
+                              { mkFunDef src p n ps r b }
+  ret       :: R Type    <- arrow t:typ
+  arrow     :: ()        <- "->" sp
+  params    :: [R Param] <- q:param qs:(comma y:param)*  { q : qs }
+                          / { [] }
+  param     :: R Param   <- p:@ "self" ![a-zA-Z0-9_] sp  { Right (Param (posAt src p) "self" Nothing) }
+                          / p:@ n:name t:annot?          { mkParam src p n t }
+  annot     :: R Type    <- colon t:typ
+  colon     :: ()        <- ':' sp
+
+  classdef  :: R ClassDef <- p:@ "class" ![a-zA-Z0-9_] sp n:name s:super? ':' sp eol ind
+                             b:classbody                 { mkClassDef src p n s b }
+  super     :: Name      <- superopen n:name ')' sp
+  superopen :: ()        <- '(' sp
+  classbody :: R ([Field], [FunDef]) <- r:(m:members)^>
+  members   :: R ([Field], [FunDef])
+            <- f:|x:field| fs:(ind g:|y:field|)* ms:(ind h:|z:fundef|)* passtail?
+                 { mkMembers (f : fs) ms }
+             / h:|x:fundef| ms:(ind k:|z:fundef|)* passtail?
+                 { mkMembers [] (h : ms) }
+             / |"pass" ![a-zA-Z0-9_] sp| eol             { Right ([], []) }
+  passtail  :: ()        <- passkw eol
+  passkw    :: ()        <- ind |"pass" ![a-zA-Z0-9_] sp|
+  field     :: R Field   <- p:@ n:name ':' sp t:typ eol  { mkField src p n t }
+
+  # Blocos e comandos.
+  suite     :: R Block   <- eol ind b:body
+  body      :: R Block   <- r:(s:|x:stmt| ss:(ind t:|y:stmt|)* { sequence (s : ss) })^>
+
+  stmt      :: R Stmt    <- a:ifstmt / b:whilestmt / c:forstmt / d:simple eol
+
+  ifstmt    :: R Stmt    <- p:@ "if" ![a-zA-Z0-9_] sp c:expr ':' sp b:suite
+                            es:elifcl* e:elsecl?       { mkIf src p c b es e }
+  elifcl    :: (Int, Expr, R Block) <- q:elifkw c:expr ':' sp b:suite  { (q, c, b) }
+  elifkw    :: Int       <- ind q:@ |"elif"| ![a-zA-Z0-9_] sp
+  elsecl    :: R Block   <- elsekw ':' sp b:suite
+  elsekw    :: ()        <- ind |"else"| ![a-zA-Z0-9_] sp
+
+  whilestmt :: R Stmt    <- p:@ "while" ![a-zA-Z0-9_] sp c:expr ':' sp b:suite
+                              { fmap (SWhile (posAt src p) c) b }
+  forstmt   :: R Stmt    <- p:@ "for" ![a-zA-Z0-9_] sp v:name "in" ![a-zA-Z0-9_] sp
+                            e:expr ':' sp b:suite      { fmap (SFor (posAt src p) v e) b }
+
+  simple    :: R Stmt    <- p:@ "pass" ![a-zA-Z0-9_] sp      { Right (SPass (posAt src p)) }
+                          / p:@ "break" ![a-zA-Z0-9_] sp     { Right (SBreak (posAt src p)) }
+                          / p:@ "continue" ![a-zA-Z0-9_] sp  { Right (SContinue (posAt src p)) }
+                          / p:@ "return" ![a-zA-Z0-9_] sp e:expr?
+                              { Right (SReturn (posAt src p) e) }
+                          / p:@ n:name ':' sp t:typ '=' !'=' sp e:expr
+                              { mkVarDecl src p n t e }
+                          / e:expr r:assigntail?         { mkAssign e r }
+  assigntail :: (Maybe AugOp, Expr) <- o:assignop v:expr  { (o, v) }
+  assignop  :: Maybe AugOp <- '=' !'=' sp   { Nothing }
+                            / "+=" sp       { Just AddAssign }
+                            / "-=" sp       { Just SubAssign }
+                            / "*=" sp       { Just MulAssign }
+                            / "//=" sp      { Just FloorDivAssign }
+                            / "/=" sp       { Just DivAssign }
+                            / "%=" sp       { Just ModAssign }
+
+  # Tipos.
+  typ       :: R Type    <- p:@ "int" ![a-zA-Z0-9_] sp    { Right (TyInt (posAt src p)) }
+                          / p:@ "float" ![a-zA-Z0-9_] sp  { Right (TyFloat (posAt src p)) }
+                          / p:@ "bool" ![a-zA-Z0-9_] sp   { Right (TyBool (posAt src p)) }
+                          / p:@ "str" ![a-zA-Z0-9_] sp    { Right (TyStr (posAt src p)) }
+                          / p:@ "None" ![a-zA-Z0-9_] sp   { Right (TyNone (posAt src p)) }
+                          / p:@ '(' ts:(sp xs:types ')')_~ sp "->" sp r:typ
+                              { mkFunType src p ts r }
+                          / p:@ n:name a:typearg?         { mkNamedType src p n a }
+  typearg   :: (Int, R Type) <- q:typeopen t:(sp x:typ ']')_~ sp  { (q, t) }
+  typeopen  :: Int       <- q:@ '['
+  types     :: [R Type]  <- t:typ ts:(comma u:typ)*  { t : ts }
+                          / { [] }
+
+  # Expressoes, da menor para a maior precedencia, como na GLC.
+  expr      :: Expr      <- e:disj c:condtail?         { mkCond e c }
+  condtail  :: (Expr, Expr) <- condkw c:disj "else" ![a-zA-Z0-9_] sp a:expr  { (c, a) }
+  condkw    :: ()        <- "if" ![a-zA-Z0-9_] sp
+  disj      :: Expr      <- e:conj es:(orkw r:conj)*   { chainOf Or e es }
+  orkw      :: ()        <- "or" ![a-zA-Z0-9_] sp
+  conj      :: Expr      <- e:neg es:(andkw r:neg)*    { chainOf And e es }
+  andkw     :: ()        <- "and" ![a-zA-Z0-9_] sp
+  neg       :: Expr      <- p:@ "not" ![a-zA-Z0-9_] sp e:neg  { EUnOp (posAt src p) Not e }
+                          / e:rel
+  rel       :: Expr      <- e:sum r:reltail?           { mkRel e r }
+  reltail   :: (BinOp, Expr) <- o:relop r:sum          { (o, r) }
+  relop     :: BinOp     <- "==" sp { Eq } / "!=" sp { Neq } / "<=" sp { Le }
+                          / ">=" sp { Ge } / '<' sp { Lt } / '>' sp { Gt }
+  sum       :: Expr      <- e:term es:(o:addop r:term { (o, r) })*  { chain e es }
+  addop     :: BinOp     <- '+' !'=' sp { Add } / '-' ![=>] sp { Sub }
+  term      :: Expr      <- e:power es:(o:mulop r:power { (o, r) })*  { chain e es }
+  mulop     :: BinOp     <- "//" !'=' sp { FloorDiv } / '/' !'=' sp { Div }
+                          / '%' !'=' sp { Mod } / '*' ![*=] sp { Mul }
+  power     :: Expr      <- b:unary r:powtail?         { mkPow b r }
+  powtail   :: Expr      <- powkw e:power
+  powkw     :: ()        <- "**" sp
+  unary     :: Expr      <- p:@ '-' ![=>] sp e:unary   { EUnOp (posAt src p) Neg e }
+                          / e:postfix
+  postfix   :: Expr      <- a:atom ps:post*            { mkPostfix a ps }
+  post      :: Postfix   <- lpar args:(sp xs:exprs ')')_~ sp  { PCall args }
+                          / lbrk i:(sp x:expr ']')_~ sp       { PIndex i }
+                          / dot n:name                        { PField n }
+  lpar      :: ()        <- '('
+  lbrk      :: ()        <- '['
+  dot       :: ()        <- '.' sp
+
+  atom      :: Expr      <- p:@ "True" ![a-zA-Z0-9_] sp   { EBool (posAt src p) True }
+                          / p:@ "False" ![a-zA-Z0-9_] sp  { EBool (posAt src p) False }
+                          / p:@ "None" ![a-zA-Z0-9_] sp   { ENone (posAt src p) }
+                          / p:@ "self" ![a-zA-Z0-9_] sp   { ESelf (posAt src p) }
+                          / p:@ k:convkw sp               { EVar (posAt src p) k }
+                          / p:@ n:name                    { EVar (posAt src p) n }
+                          / n:number
+                          / p:@ s:string                  { EStr (posAt src p) s }
+                          / p:@ '[' es:(sp xs:exprs ']')_~ sp  { EList (posAt src p) es }
+                          / p:@ "lambda" ![a-zA-Z0-9_] sp ps:lparams ':' sp b:expr
+                              { ELambda (posAt src p) ps b }
+                          / '(' e:(sp x:expr ')')_~ sp
+  convkw    :: String    <- "int" ![a-zA-Z0-9_]   { "int" }
+                          / "float" ![a-zA-Z0-9_] { "float" }
+                          / "str" ![a-zA-Z0-9_]   { "str" }
+                          / "bool" ![a-zA-Z0-9_]  { "bool" }
+  exprs     :: [Expr]    <- e:expr es:(comma x:expr)*  { e : es }
+                          / { [] }
+  lparams   :: [Name]    <- n:name ns:(comma m:name)*  { n : ns }
+                          / { [] }
+  comma     :: ()        <- ',' sp
+
+  # Lexico: nomes, palavras reservadas e literais. Em keyword, "int"
+  # precisa vir antes de "in": a escolha e ordenada e nao volta atras.
+  name      :: Name      <- !keyword c:[a-zA-Z_] cs:nametail sp  { c : cs }
+  nametail  :: String    <- cs:[a-zA-Z0-9_]*
+  keyword   :: ()        <- ( "and" / "break" / "bool" / "class" / "continue" / "def"
+                            / "elif" / "else" / "False" / "float" / "for" / "if" / "int"
+                            / "in" / "lambda" / "None" / "not" / "or" / "pass" / "return"
+                            / "self" / "str" / "True" / "while" ) ![a-zA-Z0-9_]
+
+  number    :: Expr      <- p:@ i:digits f:fraction? x:exponent? sp  { mkNumber src p i f x }
+  digits    :: String    <- d:[0-9] ds:[0-9_]*         { d : ds }
+  fraction  :: String    <- '.' d:[0-9] ds:[0-9_]*    { '.' : d : ds }
+  exponent  :: String    <- e:[eE] s:sign ds:[0-9]+    { e : s ++ ds }
+  sign      :: String    <- '+' { "+" } / '-' { "-" } / { "" }
+
+  string    :: String    <- '"' cs:dqchar* '"' sp      { cs }
+                          / '\'' cs:sqchar* '\'' sp    { cs }
+  dqchar    :: Char      <- '\\' c:escape { c } / c:[^"\\\n] { c }
+  sqchar    :: Char      <- '\\' c:escape { c } / c:[^'\\\n] { c }
+  escape    :: Char      <- 'n' { '\n' } / 't' { '\t' } / 'r' { '\r' }
+                          / '\\' { '\\' } / '"' { '"' } / '\'' { '\'' }
+|]
+
+-- | Tokens em gtR (ver o cabecalho do modulo); os comandos de nivel
+-- superior comecam na coluna 0.
+opts :: Opts
+opts = defaultOpts { optTokenMode = relD gtR, optCands = singletonI 0 }
+
+-- | Reconhece um programa a partir do texto fonte. A lista de tokens do
+-- lexer so e usada para descrever o token encontrado num erro.
+parseProgramPEG :: String -> [Token] -> Either Error Program
+parseProgramPEG txt toks = case parseWith opts (miniPython src) txt of
+  OK r _ _ -> r
+  Fail e   -> Left (pegError src toks e)
+  where
+    src = source txt
+
+-- | Converte o erro da typed-peg para o formato dos outros parsers.
+pegError :: Source -> [Token] -> ParseError -> Error
+pegError src toks e = Error p (case esperado of
+  Just w  -> "expected " ++ w ++ ", got " ++ achado
+  Nothing -> "unexpected " ++ achado)
+  where
+    p = posAt src (errOffset e)
+    achado = case [t | t <- toks, tokPos t == p] of
+      (t : _) -> describeLexeme (tokLexeme t)
+      []      -> case errFound e of
+        FoundToken "\n" -> "NEWLINE"
+        FoundToken w    -> "'" ++ w ++ "'"
+        FoundEnd        -> "EOF"
+    -- Um nome de regra diz mais que um caractere solto; sem nenhum,
+    -- vale o primeiro item na ordem em que a gramatica tentou.
+    esperado = case [l | ExpLabel l <- errExpected e] of
+      (l : _) -> Just l
+      []      -> case errExpected e of
+        (x : _) -> Just (describe x)
+        []      -> Nothing
+    describe x = case x of
+      ExpChar '\n' -> "NEWLINE"
+      ExpChar c    -> "'" ++ [c] ++ "'"
+      ExpString s  -> "'" ++ s ++ "'"
+      ExpClass d   -> d
+      ExpAny       -> "any character"
+      ExpEnd       -> "EOF"
+      ExpLabel l   -> l

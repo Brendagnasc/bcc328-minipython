@@ -7,34 +7,25 @@
 
 -- | Adaptacao da lista de tokens ao fluxo de entrada do Megaparsec.
 --
--- O parser PEG opera sobre a saida do analisador lexico, ja com
--- INDENT e DEDENT inseridos, e nao sobre o texto fonte. Com isso os
--- blocos sao delimitados por tokens e nao ha necessidade de
+-- O parser descendente recursivo opera sobre a saida do analisador
+-- lexico, ja com INDENT e DEDENT inseridos, e nao sobre o texto fonte.
+-- Com isso os blocos sao delimitados por tokens e nao ha necessidade de
 -- combinadores de indentacao na camada sintatica.
 --
--- Megaparsec define Token e Pos com os mesmos nomes do nosso lexer,
--- por isso o modulo do lexer e importado qualificado como L.
+-- Megaparsec define Token com o mesmo nome do nosso lexer, por isso o
+-- modulo do lexer e importado qualificado como L.
 module MiniPython.Frontend.Parser.Stream
   ( TokenStream (..)
-  , PegParser
   , toStream
-  , posFromSourcePos
-  , sourcePosFromPos
   ) where
 
-import Data.List (intercalate)
-import qualified Data.List.NonEmpty as NE
 import Data.Proxy (Proxy (..))
-import Data.Void (Void)
 import qualified MiniPython.Frontend.Lexer.Token as L
-import Text.Megaparsec
+import Text.Megaparsec (Stream (..))
 
--- | Fluxo de tokens consumido pelo parser PEG.
+-- | Fluxo de tokens consumido pelo parser.
 newtype TokenStream = TokenStream { unTokenStream :: [L.Token] }
   deriving (Eq, Ord)
-
--- | Tipo concreto dos parsers do analisador PEG.
-type PegParser = Parsec Void TokenStream
 
 toStream :: [L.Token] -> TokenStream
 toStream = TokenStream
@@ -59,50 +50,3 @@ instance Stream TokenStream where
 
   takeWhile_ f (TokenStream ts) =
     let (xs, ys) = span f ts in (xs, TokenStream ys)
-
-instance VisualStream TokenStream where
-  showTokens Proxy = intercalate ", " . NE.toList . fmap showToken
-  tokensLength Proxy = length
-
--- | O Megaparsec usa esta instancia para localizar o erro no fonte.
--- Como o fluxo e de tokens, a posicao vem do proprio token em vez de
--- ser obtida contando caracteres do texto original.
-instance TraversableStream TokenStream where
-  reachOffset o pst =
-    ( Nothing
-    , pst
-        { pstateOffset = max (pstateOffset pst) o
-        , pstateSourcePos = posFor resto
-        , pstateInput = TokenStream resto
-        }
-    )
-    where
-      toks = unTokenStream (pstateInput pst)
-      resto = drop (o - pstateOffset pst) toks
-      posFor (t : _) =
-        sourcePosFromPos (sourceName (pstateSourcePos pst)) (L.tokPos t)
-      posFor [] = pstateSourcePos pst
-
-showToken :: L.Token -> String
-showToken t = case L.tokLexeme t of
-  L.TkIdent n     -> "identificador " ++ show n
-  L.TkIntLit n    -> "literal inteiro " ++ show n
-  L.TkFloatLit d  -> "literal float " ++ show d
-  L.TkStrLit s -> "literal string " ++ show s
-  L.TkBoolLit b   -> if b then "True" else "False"
-  L.TkNewline     -> "fim de linha"
-  L.TkIndent      -> "aumento de indentacao"
-  L.TkDedent      -> "fim de bloco"
-  L.TkEOF         -> "fim do arquivo"
-  other          -> L.describeLexeme other
-
--- | Converte a posicao do nosso lexer para a do Megaparsec.
-sourcePosFromPos :: FilePath -> L.Pos -> SourcePos
-sourcePosFromPos file p =
-  SourcePos file (mkPos (L.posLine p)) (mkPos (L.posCol p))
-
--- | Converte de volta, para que os erros do parser PEG usem o mesmo
--- formato dos demais analisadores.
-posFromSourcePos :: SourcePos -> L.Pos
-posFromSourcePos sp =
-  L.Pos (unPos (sourceLine sp)) (unPos (sourceColumn sp))

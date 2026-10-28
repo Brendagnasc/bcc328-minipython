@@ -98,19 +98,10 @@ import MiniPython.Utils.Error
   DEDENT  { Token TkDedent _ }
   EOF     { Token TkEOF _ }
 
--- Precedencia da menor para a maior, conforme a secao 6.3 da
--- especificacao. A diretiva %nonassoc nos operadores relacionais
--- torna a < b < c um erro de sintaxe.
--- 'lambda' recebe a menor precedencia de todas para resolver o
--- conflito shift/reduce da regra do corpo da lambda: ao ver um
--- operador apos o corpo, o parser desloca em vez de reduzir, de modo
--- que lambda x: x + 1 seja a funcao que soma 1, e nao a lambda
--- somada a 1. O corpo e uma expressao unica (secao 6.11).
--- NEG vem depois de '**' porque o menos unario liga mais forte:
--- -2 ** 2 e (-2) ** 2. A condicional associa a direita, como na GLC:
--- a if b else c if d else e e a if b else (c if d else e).
-%nonassoc LAMBDA
-%right 'if' 'else'
+-- Precedencia dos operadores, da menor para a maior, conforme a secao
+-- 6.3 da especificacao. A diretiva %nonassoc nos relacionais torna
+-- a < b < c um erro de sintaxe. NEG vem depois de '**' porque o menos
+-- unario liga mais forte: -2 ** 2 e (-2) ** 2.
 %left 'or'
 %left 'and'
 %right 'not'
@@ -119,7 +110,6 @@ import MiniPython.Utils.Error
 %left '*' '/' '//' '%'
 %right '**'
 %right NEG
-%left '.' '[' '('
 
 %%
 
@@ -246,27 +236,37 @@ TipoList :: { [Type] }
   : Tipo                            { [$1] }
   | TipoList ',' Tipo               { $3 : $1 }
 
+-- A lambda e a condicional ficam fora da producao dos operadores, como
+-- na GLC: o corpo da lambda e o ramo else sao Expr completas, mas a
+-- condicao e o valor da condicional sao Operacao, entao nao podem ser,
+-- sem parenteses, outra condicional nem uma lambda. Nenhuma diretiva de
+-- precedencia expressa isso, porque nessas posicoes nao ha conflito:
+-- o unico movimento possivel e deslocar.
 Expr :: { Expr }
-  : Expr 'if' Expr 'else' Expr      { ECond (exprPos $1) $1 $3 $5 }
-  | Expr 'or' Expr                  { EBinOp (exprPos $1) Or $1 $3 }
-  | Expr 'and' Expr                 { EBinOp (exprPos $1) And $1 $3 }
-  | 'not' Expr                      { EUnOp (tokPos $1) Not $2 }
-  | Expr '==' Expr                  { EBinOp (exprPos $1) Eq $1 $3 }
-  | Expr '!=' Expr                  { EBinOp (exprPos $1) Neq $1 $3 }
-  | Expr '<' Expr                   { EBinOp (exprPos $1) Lt $1 $3 }
-  | Expr '<=' Expr                  { EBinOp (exprPos $1) Le $1 $3 }
-  | Expr '>' Expr                   { EBinOp (exprPos $1) Gt $1 $3 }
-  | Expr '>=' Expr                  { EBinOp (exprPos $1) Ge $1 $3 }
-  | Expr '+' Expr                   { EBinOp (exprPos $1) Add $1 $3 }
-  | Expr '-' Expr                   { EBinOp (exprPos $1) Sub $1 $3 }
-  | Expr '*' Expr                   { EBinOp (exprPos $1) Mul $1 $3 }
-  | Expr '/' Expr                   { EBinOp (exprPos $1) Div $1 $3 }
-  | Expr '//' Expr                  { EBinOp (exprPos $1) FloorDiv $1 $3 }
-  | Expr '%' Expr                   { EBinOp (exprPos $1) Mod $1 $3 }
-  | '-' Expr %prec NEG              { EUnOp (tokPos $1) Neg $2 }
-  | Expr '**' Expr                  { EBinOp (exprPos $1) Pow $1 $3 }
-  | 'lambda' LambdaParams ':' Expr %prec LAMBDA
-                                    { ELambda (tokPos $1) (reverse $2) $4 }
+  : 'lambda' LambdaParams ':' Expr      { ELambda (tokPos $1) (reverse $2) $4 }
+  | Operacao 'if' Operacao 'else' Expr  { ECond (exprPos $1) $1 $3 $5 }
+  | Operacao                            { $1 }
+
+-- Todos os operadores numa producao so, sem estratificacao: a
+-- precedencia vem das diretivas %left, %right e %nonassoc.
+Operacao :: { Expr }
+  : Operacao 'or' Operacao          { EBinOp (exprPos $1) Or $1 $3 }
+  | Operacao 'and' Operacao         { EBinOp (exprPos $1) And $1 $3 }
+  | 'not' Operacao                  { EUnOp (tokPos $1) Not $2 }
+  | Operacao '==' Operacao          { EBinOp (exprPos $1) Eq $1 $3 }
+  | Operacao '!=' Operacao          { EBinOp (exprPos $1) Neq $1 $3 }
+  | Operacao '<' Operacao           { EBinOp (exprPos $1) Lt $1 $3 }
+  | Operacao '<=' Operacao          { EBinOp (exprPos $1) Le $1 $3 }
+  | Operacao '>' Operacao           { EBinOp (exprPos $1) Gt $1 $3 }
+  | Operacao '>=' Operacao          { EBinOp (exprPos $1) Ge $1 $3 }
+  | Operacao '+' Operacao           { EBinOp (exprPos $1) Add $1 $3 }
+  | Operacao '-' Operacao           { EBinOp (exprPos $1) Sub $1 $3 }
+  | Operacao '*' Operacao           { EBinOp (exprPos $1) Mul $1 $3 }
+  | Operacao '/' Operacao           { EBinOp (exprPos $1) Div $1 $3 }
+  | Operacao '//' Operacao          { EBinOp (exprPos $1) FloorDiv $1 $3 }
+  | Operacao '%' Operacao           { EBinOp (exprPos $1) Mod $1 $3 }
+  | '-' Operacao %prec NEG          { EUnOp (tokPos $1) Neg $2 }
+  | Operacao '**' Operacao          { EBinOp (exprPos $1) Pow $1 $3 }
   | Posfixa                         { $1 }
 
 LambdaParams :: { [Name] }

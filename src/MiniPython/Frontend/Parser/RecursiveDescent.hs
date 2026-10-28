@@ -415,18 +415,32 @@ nameType p n = case n of
 
 -- Expressoes ---------------------------------------------------------
 
--- | Expr ::= ExprOu [ 'if' ExprOu 'else' Expr ]
+-- | Expr ::= 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
+--          | ExprOu [ 'if' ExprOu 'else' Expr ]
+--
+-- A lambda fica neste nivel, e nao entre os atomos: o corpo vai ate o
+-- fim da expressao, e lambda x: x + 1 tem uma leitura so. Como operando
+-- de outro operador ela precisa de parenteses. Os parametros nao tem
+-- anotacao e podem faltar, como em lambda: 42 (secao 6.11).
 --
 -- A expressao condicional associa a direita: o ramo else e uma Expr
 -- completa (secao 6.10 da especificacao).
 pExpr :: Parser Expr
 pExpr = do
-  e <- pOr
-  condicional <- accept TkIf
-  if not condicional then pure e else do
-    cond <- pOr
-    _ <- expect TkElse
-    ECond (exprPos e) e cond <$> pExpr
+  t <- peekToken
+  case tokLexeme t of
+    TkLambda -> do
+      _ <- advance
+      ps <- map snd <$> commaSepUntil TkColon expectIdent
+      _ <- expect TkColon
+      ELambda (tokPos t) ps <$> pExpr
+    _ -> do
+      e <- pOr
+      condicional <- accept TkIf
+      if not condicional then pure e else do
+        cond <- pOr
+        _ <- expect TkElse
+        ECond (exprPos e) e cond <$> pExpr
 
 -- | ExprOu ::= ExprE { 'or' ExprE }
 pOr :: Parser Expr
@@ -535,13 +549,6 @@ pAtom = do
       es <- commaSepUntil TkRBracket pExpr
       _ <- expect TkRBracket
       pure (EList p es)
-    -- Parametros de lambda nao tem anotacao e podem faltar, como em
-    -- lambda: 42 (secao 6.11 da especificacao).
-    TkLambda -> do
-      _ <- advance
-      ps <- map snd <$> commaSepUntil TkColon expectIdent
-      _ <- expect TkColon
-      ELambda p ps <$> pExpr
     TkLParen -> do
       _ <- advance
       e <- pExpr

@@ -304,8 +304,11 @@ mkPostfix = foldl step
   types     :: [R Type]  <- t:typ ts:(comma u:typ)*  { t : ts }
                           / { [] }
 
-  # Expressoes, da menor para a maior precedencia, como na GLC.
-  expr      :: Expr      <- e:disj c:condtail?         { mkCond e c }
+  # Expressoes, da menor para a maior precedencia, como na GLC. A lambda
+  # fica no nivel de expr, e nao entre os atomos: o corpo vai ate o fim.
+  expr      :: Expr      <- p:@ "lambda" ![a-zA-Z0-9_] sp ps:lparams ':' sp b:expr
+                              { ELambda (posAt src p) ps b }
+                          / e:disj c:condtail?         { mkCond e c }
   condtail  :: (Expr, Expr) <- condkw c:disj "else" ![a-zA-Z0-9_] sp a:expr  { (c, a) }
   condkw    :: ()        <- "if" ![a-zA-Z0-9_] sp
   disj      :: Expr      <- e:conj es:(orkw r:conj)*   { chainOf Or e es }
@@ -345,8 +348,6 @@ mkPostfix = foldl step
                           / n:number
                           / p:@ s:string                  { EStr (posAt src p) s }
                           / p:@ '[' es:(sp xs:exprs ']')_~ sp  { EList (posAt src p) es }
-                          / p:@ "lambda" ![a-zA-Z0-9_] sp ps:lparams ':' sp b:expr
-                              { ELambda (posAt src p) ps b }
                           / '(' e:(sp x:expr ')')_~ sp
   convkw    :: String    <- "int" ![a-zA-Z0-9_]   { "int" }
                           / "float" ![a-zA-Z0-9_] { "float" }

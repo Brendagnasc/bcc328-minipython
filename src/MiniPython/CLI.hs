@@ -46,16 +46,17 @@ dispatch m file
   | take 1 file == "-" = BadUsage ("opcao desconhecida: " ++ file)
   | otherwise          = Run m file
 
+-- | Texto da secao 6 do enunciado.
 usage :: String
 usage = unlines
-  [ "mpyc [OPCAO] <arquivo.mpy>"
+  [ "mpyc [OPÇÃO] <arquivo.mpy>"
   , ""
-  , "Opcoes:"
-  , "  --lex          Executa somente o analisador lexico e imprime os tokens."
-  , "  --parse-rd     Executa o analisador descendente recursivo e imprime a AST."
-  , "  --parse-peg    Executa o analisador PEG e imprime a AST."
-  , "  --parse-lalr   Executa o analisador LALR e imprime a AST."
-  , "  --help         Exibe esta ajuda."
+  , "Opções:"
+  , "  --lex             Executa somente o analisador léxico e imprime a lista de tokens."
+  , "  --parse-rd        Executa o analisador descendente recursivo e imprime a AST."
+  , "  --parse-peg       Executa o analisador PEG e imprime a AST."
+  , "  --parse-lalr      Executa o analisador LALR e imprime a AST."
+  , "  --help            Exibe esta ajuda."
   , ""
-  , "Sem opcao, o padrao e --parse-rd."
+  , "Se nenhuma opção for fornecida, o comportamento padrão é --parse-rd."
   ]

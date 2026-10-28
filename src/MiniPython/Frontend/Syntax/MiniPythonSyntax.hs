@@ -32,14 +32,17 @@ import MiniPython.Frontend.Lexer.Token (Pos)
 type Name = String
 
 -- | Um programa e uma sequencia de definicoes e comandos de nivel
--- superior, na ordem em que aparecem no arquivo.
+-- superior, na ordem em que aparecem no arquivo. O Eq serve aos testes,
+-- que comparam as ASTs dos tres parsers, posicoes incluidas.
 newtype Program = Program [Decl]
+  deriving (Eq)
 
 -- | Item de nivel superior.
 data Decl
   = DFun FunDef
   | DClass ClassDef
   | DStmt Stmt
+  deriving (Eq)
 
 -- | Definicao de funcao ou metodo. As anotacoes sao opcionais
 -- (secao 6.2 da especificacao), por isso os campos Maybe.
@@ -50,6 +53,7 @@ data FunDef = FunDef
   , fnReturn :: Maybe Type
   , fnBody   :: Block
   }
+  deriving (Eq)
 
 -- | Parametro formal de uma funcao.
 data Param = Param
@@ -57,6 +61,7 @@ data Param = Param
   , paramName :: Name
   , paramType :: Maybe Type
   }
+  deriving (Eq)
 
 -- | Definicao de classe, com heranca simples opcional.
 data ClassDef = ClassDef
@@ -66,6 +71,7 @@ data ClassDef = ClassDef
   , clsFields  :: [Field]
   , clsMethods :: [FunDef]
   }
+  deriving (Eq)
 
 -- | Campo de classe. A anotacao de tipo e obrigatoria (secao 6.3).
 data Field = Field
@@ -73,6 +79,7 @@ data Field = Field
   , fieldName :: Name
   , fieldType :: Type
   }
+  deriving (Eq)
 
 -- | Bloco: sequencia de comandos delimitada por INDENT e DEDENT.
 type Block = [Stmt]
@@ -97,12 +104,14 @@ data Stmt
   | SPass Pos
   -- | Expressao usada como comando, tipicamente uma chamada.
   | SExpr Pos Expr
+  deriving (Eq)
 
 -- | Alvo de uma atribuicao.
 data LValue
   = LVar Pos Name
   | LIndex Pos Expr Expr
   | LField Pos Expr Name
+  deriving (Eq)
 
 -- | Operadores de atribuicao aumentada (secao 7.1).
 data AugOp
@@ -130,6 +139,7 @@ data Expr
   | ELambda Pos [Name] Expr
   -- | Expressao condicional @e1 if cond else e2@ (secao 6.10).
   | ECond Pos Expr Expr Expr
+  deriving (Eq)
 
 data BinOp
   = Add | Sub | Mul | Div | FloorDiv | Mod | Pow
@@ -155,6 +165,7 @@ data Type
   | TyClass Pos Name
   -- | Variavel de tipo: identificador minusculo nao primitivo (secao 3.5).
   | TyVar Pos Name
+  deriving (Eq)
 
 -- | Posicao de uma expressao, usada nas mensagens de erro.
 exprPos :: Expr -> Pos

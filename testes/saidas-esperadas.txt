@@ -2,242 +2,1284 @@ Saidas esperadas dos programas de teste
 Brenda Gabrielle Alves Nascimento, 24.1.4011
 BCC328 - Trabalho Pratico 1
 
-Programas validos: AST reconstituida, identica nos tres analisadores.
+Programas validos: AST impressa com drawTree, identica nos tres analisadores.
 
 ====================================================================
 exemplos/mdc.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def mdc(a: int, b: int) -> int:
-    while b != 0:
-        t: int = b
-        b = a % b
-        a = t
-    return a
-def main() -> None:
-    a: int = int(input())
-    b: int = int(input())
-    print(str(mdc(a, b)))
-main()
+Program
+|
++- FunDef mdc(a: int, b: int) -> int
+|  |
+|  +- SWhile
+|  |  |
+|  |  +- EBinOp Neq
+|  |  |  |
+|  |  |  +- EVar b
+|  |  |  |
+|  |  |  `- EInt 0
+|  |  |
+|  |  `- body
+|  |     |
+|  |     +- SVarDecl t: int
+|  |     |  |
+|  |     |  `- EVar b
+|  |     |
+|  |     +- SAssign
+|  |     |  |
+|  |     |  +- LVar b
+|  |     |  |
+|  |     |  `- EBinOp Mod
+|  |     |     |
+|  |     |     +- EVar a
+|  |     |     |
+|  |     |     `- EVar b
+|  |     |
+|  |     `- SAssign
+|  |        |
+|  |        +- LVar a
+|  |        |
+|  |        `- EVar t
+|  |
+|  `- SReturn
+|     |
+|     `- EVar a
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl a: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  +- SVarDecl b: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  `- SExpr
+|     |
+|     `- ECall
+|        |
+|        +- EVar print
+|        |
+|        `- ECall
+|           |
+|           +- EVar str
+|           |
+|           `- ECall
+|              |
+|              +- EVar mdc
+|              |
+|              +- EVar a
+|              |
+|              `- EVar b
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/fib.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def fib(n: int) -> int:
-    if n <= 1:
-        return n
-    return fib(n - 1) + fib(n - 2)
-def main() -> None:
-    n: int = int(input())
-    i: int = 0
-    while i <= n:
-        print(str(fib(i)))
-        i = i + 1
-main()
+Program
+|
++- FunDef fib(n: int) -> int
+|  |
+|  +- SIf
+|  |  |
+|  |  +- EBinOp Le
+|  |  |  |
+|  |  |  +- EVar n
+|  |  |  |
+|  |  |  `- EInt 1
+|  |  |
+|  |  `- then
+|  |     |
+|  |     `- SReturn
+|  |        |
+|  |        `- EVar n
+|  |
+|  `- SReturn
+|     |
+|     `- EBinOp Add
+|        |
+|        +- ECall
+|        |  |
+|        |  +- EVar fib
+|        |  |
+|        |  `- EBinOp Sub
+|        |     |
+|        |     +- EVar n
+|        |     |
+|        |     `- EInt 1
+|        |
+|        `- ECall
+|           |
+|           +- EVar fib
+|           |
+|           `- EBinOp Sub
+|              |
+|              +- EVar n
+|              |
+|              `- EInt 2
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl n: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  `- SWhile
+|     |
+|     +- EBinOp Le
+|     |  |
+|     |  +- EVar i
+|     |  |
+|     |  `- EVar n
+|     |
+|     `- body
+|        |
+|        +- SExpr
+|        |  |
+|        |  `- ECall
+|        |     |
+|        |     +- EVar print
+|        |     |
+|        |     `- ECall
+|        |        |
+|        |        +- EVar str
+|        |        |
+|        |        `- ECall
+|        |           |
+|        |           +- EVar fib
+|        |           |
+|        |           `- EVar i
+|        |
+|        `- SAssign
+|           |
+|           +- LVar i
+|           |
+|           `- EBinOp Add
+|              |
+|              +- EVar i
+|              |
+|              `- EInt 1
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/busca.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def busca(arr: list[int], val: int) -> int:
-    i: int = 0
-    while i < len(arr):
-        if arr[i] == val:
-            return i
-        i += 1
-    return -1
-def main() -> None:
-    n: int = int(input())
-    arr: list[int] = []
-    i: int = 0
-    while i < n:
-        append(arr, int(input()))
-        i += 1
-    val: int = int(input())
-    pos: int = busca(arr, val)
-    if pos >= 0:
-        print("Encontrado na posicao " + str(pos))
-    else:
-        print("Nao encontrado")
-main()
+Program
+|
++- FunDef busca(arr: list[int], val: int) -> int
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  +- SWhile
+|  |  |
+|  |  +- EBinOp Lt
+|  |  |  |
+|  |  |  +- EVar i
+|  |  |  |
+|  |  |  `- ECall
+|  |  |     |
+|  |  |     +- EVar len
+|  |  |     |
+|  |  |     `- EVar arr
+|  |  |
+|  |  `- body
+|  |     |
+|  |     +- SIf
+|  |     |  |
+|  |     |  +- EBinOp Eq
+|  |     |  |  |
+|  |     |  |  +- EIndex
+|  |     |  |  |  |
+|  |     |  |  |  +- EVar arr
+|  |     |  |  |  |
+|  |     |  |  |  `- EVar i
+|  |     |  |  |
+|  |     |  |  `- EVar val
+|  |     |  |
+|  |     |  `- then
+|  |     |     |
+|  |     |     `- SReturn
+|  |     |        |
+|  |     |        `- EVar i
+|  |     |
+|  |     `- SAugAssign AddAssign
+|  |        |
+|  |        +- LVar i
+|  |        |
+|  |        `- EInt 1
+|  |
+|  `- SReturn
+|     |
+|     `- EUnOp Neg
+|        |
+|        `- EInt 1
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl n: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  +- SVarDecl arr: list[int]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  +- SWhile
+|  |  |
+|  |  +- EBinOp Lt
+|  |  |  |
+|  |  |  +- EVar i
+|  |  |  |
+|  |  |  `- EVar n
+|  |  |
+|  |  `- body
+|  |     |
+|  |     +- SExpr
+|  |     |  |
+|  |     |  `- ECall
+|  |     |     |
+|  |     |     +- EVar append
+|  |     |     |
+|  |     |     +- EVar arr
+|  |     |     |
+|  |     |     `- ECall
+|  |     |        |
+|  |     |        +- EVar int
+|  |     |        |
+|  |     |        `- ECall
+|  |     |           |
+|  |     |           `- EVar input
+|  |     |
+|  |     `- SAugAssign AddAssign
+|  |        |
+|  |        +- LVar i
+|  |        |
+|  |        `- EInt 1
+|  |
+|  +- SVarDecl val: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  +- SVarDecl pos: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar busca
+|  |     |
+|  |     +- EVar arr
+|  |     |
+|  |     `- EVar val
+|  |
+|  `- SIf
+|     |
+|     +- EBinOp Ge
+|     |  |
+|     |  +- EVar pos
+|     |  |
+|     |  `- EInt 0
+|     |
+|     +- then
+|     |  |
+|     |  `- SExpr
+|     |     |
+|     |     `- ECall
+|     |        |
+|     |        +- EVar print
+|     |        |
+|     |        `- EBinOp Add
+|     |           |
+|     |           +- EStr "Encontrado na posicao "
+|     |           |
+|     |           `- ECall
+|     |              |
+|     |              +- EVar str
+|     |              |
+|     |              `- EVar pos
+|     |
+|     `- else
+|        |
+|        `- SExpr
+|           |
+|           `- ECall
+|              |
+|              +- EVar print
+|              |
+|              `- EStr "Nao encontrado"
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/selecao.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def min_idx(arr: list[int], inicio: int) -> int:
-    m: int = inicio
-    i: int = inicio + 1
-    while i < len(arr):
-        if arr[i] < arr[m]:
-            m = i
-        i += 1
-    return m
-def selection_sort(arr: list[int]) -> None:
-    n: int = len(arr)
-    i: int = 0
-    while i < n:
-        j: int = min_idx(arr, i)
-        t: int = arr[i]
-        arr[i] = arr[j]
-        arr[j] = t
-        i += 1
-def main() -> None:
-    n: int = int(input())
-    arr: list[int] = []
-    i: int = 0
-    while i < n:
-        append(arr, int(input()))
-        i += 1
-    selection_sort(arr)
-    for x in arr:
-        print(str(x))
-main()
+Program
+|
++- FunDef min_idx(arr: list[int], inicio: int) -> int
+|  |
+|  +- SVarDecl m: int
+|  |  |
+|  |  `- EVar inicio
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EBinOp Add
+|  |     |
+|  |     +- EVar inicio
+|  |     |
+|  |     `- EInt 1
+|  |
+|  +- SWhile
+|  |  |
+|  |  +- EBinOp Lt
+|  |  |  |
+|  |  |  +- EVar i
+|  |  |  |
+|  |  |  `- ECall
+|  |  |     |
+|  |  |     +- EVar len
+|  |  |     |
+|  |  |     `- EVar arr
+|  |  |
+|  |  `- body
+|  |     |
+|  |     +- SIf
+|  |     |  |
+|  |     |  +- EBinOp Lt
+|  |     |  |  |
+|  |     |  |  +- EIndex
+|  |     |  |  |  |
+|  |     |  |  |  +- EVar arr
+|  |     |  |  |  |
+|  |     |  |  |  `- EVar i
+|  |     |  |  |
+|  |     |  |  `- EIndex
+|  |     |  |     |
+|  |     |  |     +- EVar arr
+|  |     |  |     |
+|  |     |  |     `- EVar m
+|  |     |  |
+|  |     |  `- then
+|  |     |     |
+|  |     |     `- SAssign
+|  |     |        |
+|  |     |        +- LVar m
+|  |     |        |
+|  |     |        `- EVar i
+|  |     |
+|  |     `- SAugAssign AddAssign
+|  |        |
+|  |        +- LVar i
+|  |        |
+|  |        `- EInt 1
+|  |
+|  `- SReturn
+|     |
+|     `- EVar m
+|
++- FunDef selection_sort(arr: list[int]) -> None
+|  |
+|  +- SVarDecl n: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar len
+|  |     |
+|  |     `- EVar arr
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  `- SWhile
+|     |
+|     +- EBinOp Lt
+|     |  |
+|     |  +- EVar i
+|     |  |
+|     |  `- EVar n
+|     |
+|     `- body
+|        |
+|        +- SVarDecl j: int
+|        |  |
+|        |  `- ECall
+|        |     |
+|        |     +- EVar min_idx
+|        |     |
+|        |     +- EVar arr
+|        |     |
+|        |     `- EVar i
+|        |
+|        +- SVarDecl t: int
+|        |  |
+|        |  `- EIndex
+|        |     |
+|        |     +- EVar arr
+|        |     |
+|        |     `- EVar i
+|        |
+|        +- SAssign
+|        |  |
+|        |  +- LIndex
+|        |  |  |
+|        |  |  +- EVar arr
+|        |  |  |
+|        |  |  `- EVar i
+|        |  |
+|        |  `- EIndex
+|        |     |
+|        |     +- EVar arr
+|        |     |
+|        |     `- EVar j
+|        |
+|        +- SAssign
+|        |  |
+|        |  +- LIndex
+|        |  |  |
+|        |  |  +- EVar arr
+|        |  |  |
+|        |  |  `- EVar j
+|        |  |
+|        |  `- EVar t
+|        |
+|        `- SAugAssign AddAssign
+|           |
+|           +- LVar i
+|           |
+|           `- EInt 1
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl n: int
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar int
+|  |     |
+|  |     `- ECall
+|  |        |
+|  |        `- EVar input
+|  |
+|  +- SVarDecl arr: list[int]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SVarDecl i: int
+|  |  |
+|  |  `- EInt 0
+|  |
+|  +- SWhile
+|  |  |
+|  |  +- EBinOp Lt
+|  |  |  |
+|  |  |  +- EVar i
+|  |  |  |
+|  |  |  `- EVar n
+|  |  |
+|  |  `- body
+|  |     |
+|  |     +- SExpr
+|  |     |  |
+|  |     |  `- ECall
+|  |     |     |
+|  |     |     +- EVar append
+|  |     |     |
+|  |     |     +- EVar arr
+|  |     |     |
+|  |     |     `- ECall
+|  |     |        |
+|  |     |        +- EVar int
+|  |     |        |
+|  |     |        `- ECall
+|  |     |           |
+|  |     |           `- EVar input
+|  |     |
+|  |     `- SAugAssign AddAssign
+|  |        |
+|  |        +- LVar i
+|  |        |
+|  |        `- EInt 1
+|  |
+|  +- SExpr
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar selection_sort
+|  |     |
+|  |     `- EVar arr
+|  |
+|  `- SFor x
+|     |
+|     +- EVar arr
+|     |
+|     `- body
+|        |
+|        `- SExpr
+|           |
+|           `- ECall
+|              |
+|              +- EVar print
+|              |
+|              `- ECall
+|                 |
+|                 +- EVar str
+|                 |
+|                 `- EVar x
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/alta_ordem.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def dobro(x: int) -> int:
-    return x * 2
-def positivo(x: int) -> bool:
-    return x > 0
-def map(f: (int) -> int, xs: list[int]) -> list[int]:
-    resultado: list[int] = []
-    for x in xs:
-        append(resultado, f(x))
-    return resultado
-def filter(p: (int) -> bool, xs: list[int]) -> list[int]:
-    resultado: list[int] = []
-    for x in xs:
-        if p(x):
-            append(resultado, x)
-    return resultado
-def main() -> None:
-    xs: list[int] = [-3, -1, 0, 2, 4, 7]
-    dobrados: list[int] = map(dobro, xs)
-    positivos: list[int] = filter(positivo, dobrados)
-    for x in positivos:
-        print(str(x))
-main()
+Program
+|
++- FunDef dobro(x: int) -> int
+|  |
+|  `- SReturn
+|     |
+|     `- EBinOp Mul
+|        |
+|        +- EVar x
+|        |
+|        `- EInt 2
+|
++- FunDef positivo(x: int) -> bool
+|  |
+|  `- SReturn
+|     |
+|     `- EBinOp Gt
+|        |
+|        +- EVar x
+|        |
+|        `- EInt 0
+|
++- FunDef map(f: (int) -> int, xs: list[int]) -> list[int]
+|  |
+|  +- SVarDecl resultado: list[int]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SFor x
+|  |  |
+|  |  +- EVar xs
+|  |  |
+|  |  `- body
+|  |     |
+|  |     `- SExpr
+|  |        |
+|  |        `- ECall
+|  |           |
+|  |           +- EVar append
+|  |           |
+|  |           +- EVar resultado
+|  |           |
+|  |           `- ECall
+|  |              |
+|  |              +- EVar f
+|  |              |
+|  |              `- EVar x
+|  |
+|  `- SReturn
+|     |
+|     `- EVar resultado
+|
++- FunDef filter(p: (int) -> bool, xs: list[int]) -> list[int]
+|  |
+|  +- SVarDecl resultado: list[int]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SFor x
+|  |  |
+|  |  +- EVar xs
+|  |  |
+|  |  `- body
+|  |     |
+|  |     `- SIf
+|  |        |
+|  |        +- ECall
+|  |        |  |
+|  |        |  +- EVar p
+|  |        |  |
+|  |        |  `- EVar x
+|  |        |
+|  |        `- then
+|  |           |
+|  |           `- SExpr
+|  |              |
+|  |              `- ECall
+|  |                 |
+|  |                 +- EVar append
+|  |                 |
+|  |                 +- EVar resultado
+|  |                 |
+|  |                 `- EVar x
+|  |
+|  `- SReturn
+|     |
+|     `- EVar resultado
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl xs: list[int]
+|  |  |
+|  |  `- EList
+|  |     |
+|  |     +- EUnOp Neg
+|  |     |  |
+|  |     |  `- EInt 3
+|  |     |
+|  |     +- EUnOp Neg
+|  |     |  |
+|  |     |  `- EInt 1
+|  |     |
+|  |     +- EInt 0
+|  |     |
+|  |     +- EInt 2
+|  |     |
+|  |     +- EInt 4
+|  |     |
+|  |     `- EInt 7
+|  |
+|  +- SVarDecl dobrados: list[int]
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar map
+|  |     |
+|  |     +- EVar dobro
+|  |     |
+|  |     `- EVar xs
+|  |
+|  +- SVarDecl positivos: list[int]
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar filter
+|  |     |
+|  |     +- EVar positivo
+|  |     |
+|  |     `- EVar dobrados
+|  |
+|  `- SFor x
+|     |
+|     +- EVar positivos
+|     |
+|     `- body
+|        |
+|        `- SExpr
+|           |
+|           `- ECall
+|              |
+|              +- EVar print
+|              |
+|              `- ECall
+|                 |
+|                 +- EVar str
+|                 |
+|                 `- EVar x
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/formas.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-class Forma:
-    def area(self) -> float:
-        return 0.0
-    def descricao(self) -> str:
-        return "area=" + str(self.area())
-class Retangulo(Forma):
-    largura: float
-    altura: float
-    def __init__(self, largura: float, altura: float) -> None:
-        self.largura = largura
-        self.altura = altura
-    def area(self) -> float:
-        return self.largura * self.altura
-class Quadrado(Retangulo):
-    def __init__(self, lado: float) -> None:
-        Retangulo.__init__(self, lado, lado)
-def imprimir(f: Forma) -> None:
-    print(f.descricao())
-def main() -> None:
-    r: Retangulo = Retangulo(3.0, 4.0)
-    q: Quadrado = Quadrado(5.0)
-    imprimir(r)
-    imprimir(q)
-main()
+Program
+|
++- ClassDef Forma
+|  |
+|  +- FunDef area(self) -> float
+|  |  |
+|  |  `- SReturn
+|  |     |
+|  |     `- EFloat 0.0
+|  |
+|  `- FunDef descricao(self) -> str
+|     |
+|     `- SReturn
+|        |
+|        `- EBinOp Add
+|           |
+|           +- EStr "area="
+|           |
+|           `- ECall
+|              |
+|              +- EVar str
+|              |
+|              `- ECall
+|                 |
+|                 `- EField area
+|                    |
+|                    `- ESelf
+|
++- ClassDef Retangulo(Forma)
+|  |
+|  +- Field largura: float
+|  |
+|  +- Field altura: float
+|  |
+|  +- FunDef __init__(self, largura: float, altura: float) -> None
+|  |  |
+|  |  +- SAssign
+|  |  |  |
+|  |  |  +- LField largura
+|  |  |  |  |
+|  |  |  |  `- ESelf
+|  |  |  |
+|  |  |  `- EVar largura
+|  |  |
+|  |  `- SAssign
+|  |     |
+|  |     +- LField altura
+|  |     |  |
+|  |     |  `- ESelf
+|  |     |
+|  |     `- EVar altura
+|  |
+|  `- FunDef area(self) -> float
+|     |
+|     `- SReturn
+|        |
+|        `- EBinOp Mul
+|           |
+|           +- EField largura
+|           |  |
+|           |  `- ESelf
+|           |
+|           `- EField altura
+|              |
+|              `- ESelf
+|
++- ClassDef Quadrado(Retangulo)
+|  |
+|  `- FunDef __init__(self, lado: float) -> None
+|     |
+|     `- SExpr
+|        |
+|        `- ECall
+|           |
+|           +- EField __init__
+|           |  |
+|           |  `- EVar Retangulo
+|           |
+|           +- ESelf
+|           |
+|           +- EVar lado
+|           |
+|           `- EVar lado
+|
++- FunDef imprimir(f: Forma) -> None
+|  |
+|  `- SExpr
+|     |
+|     `- ECall
+|        |
+|        +- EVar print
+|        |
+|        `- ECall
+|           |
+|           `- EField descricao
+|              |
+|              `- EVar f
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl r: Retangulo
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar Retangulo
+|  |     |
+|  |     +- EFloat 3.0
+|  |     |
+|  |     `- EFloat 4.0
+|  |
+|  +- SVarDecl q: Quadrado
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar Quadrado
+|  |     |
+|  |     `- EFloat 5.0
+|  |
+|  +- SExpr
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EVar imprimir
+|  |     |
+|  |     `- EVar r
+|  |
+|  `- SExpr
+|     |
+|     `- ECall
+|        |
+|        +- EVar imprimir
+|        |
+|        `- EVar q
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/pilha.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-class Pilha:
-    dados: list[int]
-    topo: int
-    def __init__(self) -> None:
-        self.dados = []
-        self.topo = 0
-    def push(self, x: int) -> None:
-        append(self.dados, x)
-        self.topo = self.topo + 1
-    def pop(self) -> int:
-        self.topo = self.topo - 1
-        return self.dados[self.topo]
-    def vazia(self) -> bool:
-        return self.topo == 0
-def main() -> None:
-    p: Pilha = Pilha()
-    p.push(10)
-    p.push(20)
-    p.push(30)
-    while not p.vazia():
-        print(str(p.pop()))
-main()
+Program
+|
++- ClassDef Pilha
+|  |
+|  +- Field dados: list[int]
+|  |
+|  +- Field topo: int
+|  |
+|  +- FunDef __init__(self) -> None
+|  |  |
+|  |  +- SAssign
+|  |  |  |
+|  |  |  +- LField dados
+|  |  |  |  |
+|  |  |  |  `- ESelf
+|  |  |  |
+|  |  |  `- EList
+|  |  |
+|  |  `- SAssign
+|  |     |
+|  |     +- LField topo
+|  |     |  |
+|  |     |  `- ESelf
+|  |     |
+|  |     `- EInt 0
+|  |
+|  +- FunDef push(self, x: int) -> None
+|  |  |
+|  |  +- SExpr
+|  |  |  |
+|  |  |  `- ECall
+|  |  |     |
+|  |  |     +- EVar append
+|  |  |     |
+|  |  |     +- EField dados
+|  |  |     |  |
+|  |  |     |  `- ESelf
+|  |  |     |
+|  |  |     `- EVar x
+|  |  |
+|  |  `- SAssign
+|  |     |
+|  |     +- LField topo
+|  |     |  |
+|  |     |  `- ESelf
+|  |     |
+|  |     `- EBinOp Add
+|  |        |
+|  |        +- EField topo
+|  |        |  |
+|  |        |  `- ESelf
+|  |        |
+|  |        `- EInt 1
+|  |
+|  +- FunDef pop(self) -> int
+|  |  |
+|  |  +- SAssign
+|  |  |  |
+|  |  |  +- LField topo
+|  |  |  |  |
+|  |  |  |  `- ESelf
+|  |  |  |
+|  |  |  `- EBinOp Sub
+|  |  |     |
+|  |  |     +- EField topo
+|  |  |     |  |
+|  |  |     |  `- ESelf
+|  |  |     |
+|  |  |     `- EInt 1
+|  |  |
+|  |  `- SReturn
+|  |     |
+|  |     `- EIndex
+|  |        |
+|  |        +- EField dados
+|  |        |  |
+|  |        |  `- ESelf
+|  |        |
+|  |        `- EField topo
+|  |           |
+|  |           `- ESelf
+|  |
+|  `- FunDef vazia(self) -> bool
+|     |
+|     `- SReturn
+|        |
+|        `- EBinOp Eq
+|           |
+|           +- EField topo
+|           |  |
+|           |  `- ESelf
+|           |
+|           `- EInt 0
+|
++- FunDef main() -> None
+|  |
+|  +- SVarDecl p: Pilha
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     `- EVar Pilha
+|  |
+|  +- SExpr
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EField push
+|  |     |  |
+|  |     |  `- EVar p
+|  |     |
+|  |     `- EInt 10
+|  |
+|  +- SExpr
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EField push
+|  |     |  |
+|  |     |  `- EVar p
+|  |     |
+|  |     `- EInt 20
+|  |
+|  +- SExpr
+|  |  |
+|  |  `- ECall
+|  |     |
+|  |     +- EField push
+|  |     |  |
+|  |     |  `- EVar p
+|  |     |
+|  |     `- EInt 30
+|  |
+|  `- SWhile
+|     |
+|     +- EUnOp Not
+|     |  |
+|     |  `- ECall
+|     |     |
+|     |     `- EField vazia
+|     |        |
+|     |        `- EVar p
+|     |
+|     `- body
+|        |
+|        `- SExpr
+|           |
+|           `- ECall
+|              |
+|              +- EVar print
+|              |
+|              `- ECall
+|                 |
+|                 +- EVar str
+|                 |
+|                 `- ECall
+|                    |
+|                    `- EField pop
+|                       |
+|                       `- EVar p
+|
+`- SExpr
+   |
+   `- ECall
+      |
+      `- EVar main
 
 ====================================================================
 exemplos/lambdas.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def map(f: (a) -> b, xs: list[a]) -> list[b]:
-    resultado: list[b] = []
-    for x in xs:
-        append(resultado, f(x))
-    return resultado
-def filter(p: (a) -> bool, xs: list[a]) -> list[a]:
-    resultado: list[a] = []
-    for x in xs:
-        if p(x):
-            append(resultado, x)
-    return resultado
-def compose(f: (b) -> c, g: (a) -> b) -> (a) -> c:
-    return (lambda x: f(g(x)))
-def multiplica_por(n: int) -> (int) -> int:
-    return (lambda x: x * n)
-nums: list[int] = [1, 2, 3, 4, 5]
-pares: list[int] = filter((lambda x: x % 2 == 0), nums)
-dobrar: (int) -> int = multiplica_por(2)
-for x in pares:
-    print(str(dobrar(x)))
+Program
+|
++- FunDef map(f: (a) -> b, xs: list[a]) -> list[b]
+|  |
+|  +- SVarDecl resultado: list[b]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SFor x
+|  |  |
+|  |  +- EVar xs
+|  |  |
+|  |  `- body
+|  |     |
+|  |     `- SExpr
+|  |        |
+|  |        `- ECall
+|  |           |
+|  |           +- EVar append
+|  |           |
+|  |           +- EVar resultado
+|  |           |
+|  |           `- ECall
+|  |              |
+|  |              +- EVar f
+|  |              |
+|  |              `- EVar x
+|  |
+|  `- SReturn
+|     |
+|     `- EVar resultado
+|
++- FunDef filter(p: (a) -> bool, xs: list[a]) -> list[a]
+|  |
+|  +- SVarDecl resultado: list[a]
+|  |  |
+|  |  `- EList
+|  |
+|  +- SFor x
+|  |  |
+|  |  +- EVar xs
+|  |  |
+|  |  `- body
+|  |     |
+|  |     `- SIf
+|  |        |
+|  |        +- ECall
+|  |        |  |
+|  |        |  +- EVar p
+|  |        |  |
+|  |        |  `- EVar x
+|  |        |
+|  |        `- then
+|  |           |
+|  |           `- SExpr
+|  |              |
+|  |              `- ECall
+|  |                 |
+|  |                 +- EVar append
+|  |                 |
+|  |                 +- EVar resultado
+|  |                 |
+|  |                 `- EVar x
+|  |
+|  `- SReturn
+|     |
+|     `- EVar resultado
+|
++- FunDef compose(f: (b) -> c, g: (a) -> b) -> (a) -> c
+|  |
+|  `- SReturn
+|     |
+|     `- ELambda x
+|        |
+|        `- ECall
+|           |
+|           +- EVar f
+|           |
+|           `- ECall
+|              |
+|              +- EVar g
+|              |
+|              `- EVar x
+|
++- FunDef multiplica_por(n: int) -> (int) -> int
+|  |
+|  `- SReturn
+|     |
+|     `- ELambda x
+|        |
+|        `- EBinOp Mul
+|           |
+|           +- EVar x
+|           |
+|           `- EVar n
+|
++- SVarDecl nums: list[int]
+|  |
+|  `- EList
+|     |
+|     +- EInt 1
+|     |
+|     +- EInt 2
+|     |
+|     +- EInt 3
+|     |
+|     +- EInt 4
+|     |
+|     `- EInt 5
+|
++- SVarDecl pares: list[int]
+|  |
+|  `- ECall
+|     |
+|     +- EVar filter
+|     |
+|     +- ELambda x
+|     |  |
+|     |  `- EBinOp Eq
+|     |     |
+|     |     +- EBinOp Mod
+|     |     |  |
+|     |     |  +- EVar x
+|     |     |  |
+|     |     |  `- EInt 2
+|     |     |
+|     |     `- EInt 0
+|     |
+|     `- EVar nums
+|
++- SVarDecl dobrar: (int) -> int
+|  |
+|  `- ECall
+|     |
+|     +- EVar multiplica_por
+|     |
+|     `- EInt 2
+|
+`- SFor x
+   |
+   +- EVar pares
+   |
+   `- body
+      |
+      `- SExpr
+         |
+         `- ECall
+            |
+            +- EVar print
+            |
+            `- ECall
+               |
+               +- EVar str
+               |
+               `- ECall
+                  |
+                  +- EVar dobrar
+                  |
+                  `- EVar x
 
 ====================================================================
 exemplos/continuacao.mpy  (--parse-rd, --parse-peg e --parse-lalr)
 ====================================================================
-def f(a: int, b: int) -> int:
-    xs: list[int] = [1, 2, 3]
-    return a + b
+Program
+|
+`- FunDef f(a: int, b: int) -> int
+   |
+   +- SVarDecl xs: list[int]
+   |  |
+   |  `- EList
+   |     |
+   |     +- EInt 1
+   |     |
+   |     +- EInt 2
+   |     |
+   |     `- EInt 3
+   |
+   `- SReturn
+      |
+      `- EBinOp Add
+         |
+         +- EVar a
+         |
+         `- EVar b
 
 ====================================================================
-Programas invalidos: mensagens de erro de cada analisador
+Programas invalidos: mensagem de erro de cada analisador
+(a mesma do arquivo .err ao lado do programa)
 ====================================================================
 
 -- exemplos/erro_char.mpy
-   --parse-rd    exemplos/erro_char.mpy:1:7: erro lexico: caractere invalido: '@'
-   --parse-peg   exemplos/erro_char.mpy:1:7: erro lexico: caractere invalido: '@'
-   --parse-lalr  exemplos/erro_char.mpy:1:7: erro lexico: caractere invalido: '@'
+   --parse-rd    erro_char.mpy:1:7: error: caractere inválido: '@'
+   --parse-peg   erro_char.mpy:1:7: error: caractere inválido: '@'
+   --parse-lalr  erro_char.mpy:1:7: error: caractere inválido: '@'
 
 -- exemplos/erro_string.mpy
-   --parse-rd    exemplos/erro_string.mpy:1:5: erro lexico: quebra de linha dentro de string
-   --parse-peg   exemplos/erro_string.mpy:1:5: erro lexico: quebra de linha dentro de string
-   --parse-lalr  exemplos/erro_string.mpy:1:5: erro lexico: quebra de linha dentro de string
+   --parse-rd    erro_string.mpy:1:5: error: string não terminada
+   --parse-peg   erro_string.mpy:1:5: error: string não terminada
+   --parse-lalr  erro_string.mpy:1:5: error: string não terminada
 
 -- exemplos/erro_indent.mpy
-   --parse-rd    exemplos/erro_indent.mpy:4:7: erro lexico: indentacao inconsistente: nivel 6 nao corresponde a nenhum nivel aberto [0,4,8]
-   --parse-peg   exemplos/erro_indent.mpy:4:7: erro lexico: indentacao inconsistente: nivel 6 nao corresponde a nenhum nivel aberto [0,4,8]
-   --parse-lalr  exemplos/erro_indent.mpy:4:7: erro lexico: indentacao inconsistente: nivel 6 nao corresponde a nenhum nivel aberto [0,4,8]
+   --parse-rd    erro_indent.mpy:3:14: error: nível de indentação inválido: 6 não está na pilha de indentação
+   --parse-peg   erro_indent.mpy:3:14: error: nível de indentação inválido: 6 não está na pilha de indentação
+   --parse-lalr  erro_indent.mpy:3:14: error: nível de indentação inválido: 6 não está na pilha de indentação
 
 -- exemplos/erro_sem_colon.mpy
-   --parse-rd    exemplos/erro_sem_colon.mpy:1:21: erro sintatico: esperado :, encontrado fim de linha (em definicao de funcao)
-   --parse-peg   exemplos/erro_sem_colon.mpy:1:21: erro sintatico: unexpected fim de linha
-   --parse-lalr  exemplos/erro_sem_colon.mpy:1:21: erro sintatico: token inesperado NEWLINE
+   --parse-rd    erro_sem_colon.mpy:1:21: error: expected ':', got NEWLINE
+   --parse-peg   erro_sem_colon.mpy:1:21: error: expected ':', got NEWLINE
+   --parse-lalr  erro_sem_colon.mpy:1:21: error: expected ':', got NEWLINE
 
 -- exemplos/erro_if_colon.mpy
-   --parse-rd    exemplos/erro_if_colon.mpy:2:13: erro sintatico: esperado :, encontrado fim de linha (em comando if)
-   --parse-peg   exemplos/erro_if_colon.mpy:2:13: erro sintatico: unexpected fim de linha
-   --parse-lalr  exemplos/erro_if_colon.mpy:2:13: erro sintatico: token inesperado NEWLINE
+   --parse-rd    erro_if_colon.mpy:2:13: error: expected ':', got NEWLINE
+   --parse-peg   erro_if_colon.mpy:2:13: error: expected ':', got NEWLINE
+   --parse-lalr  erro_if_colon.mpy:2:13: error: expected ':', got NEWLINE
 
 -- exemplos/erro_alvo.mpy
-   --parse-rd    exemplos/erro_alvo.mpy:2:1: erro sintatico: esperado um alvo de atribuicao valido, encontrado esta expressao (em atribuicao)
-   --parse-peg   exemplos/erro_alvo.mpy:2:9: erro sintatico: alvo de atribuicao valido
-   --parse-lalr  exemplos/erro_alvo.mpy:2:1: erro sintatico: alvo de atribuicao invalido
+   --parse-rd    erro_alvo.mpy:2:1: error: invalid assignment target
+   --parse-peg   erro_alvo.mpy:2:1: error: invalid assignment target
+   --parse-lalr  erro_alvo.mpy:2:1: error: invalid assignment target
 
 -- exemplos/erro_rel.mpy
-   --parse-rd    exemplos/erro_rel.mpy:2:18: erro sintatico: esperado fim de linha, encontrado LT (em comando)
-   --parse-peg   exemplos/erro_rel.mpy:2:18: erro sintatico: unexpected LT
-   --parse-lalr  exemplos/erro_rel.mpy:2:18: erro sintatico: token inesperado LT
+   --parse-rd    erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
+   --parse-peg   erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
+   --parse-lalr  erro_rel.mpy:2:18: error: expected NEWLINE, got '<'
 

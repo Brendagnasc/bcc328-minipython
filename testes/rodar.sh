@@ -1,60 +1,51 @@
 #!/usr/bin/env bash
 # Suite de testes do analisador lexico e sintatico do MiniPython.
 #
-# Verifica que os programas validos sao aceitos pelos tres
-# analisadores com a mesma AST, e que os programas invalidos sao
-# rejeitados com mensagem posicionada.
+# Programa com arquivo .err ao lado e invalido: a saida de erro de cada
+# analisador tem que ser exatamente o conteudo do .err, como na secao 7
+# do enunciado. Os demais sao validos e os tres analisadores tem que
+# imprimir a mesma AST. Os de exemplos/invalid/semantic so tem erros de
+# tipo, que sao do proximo trabalho, e aqui contam como validos.
 #
 # Uso: bash testes/rodar.sh
 
 set -u
 cd "$(dirname "$0")/.."
 
-VALIDOS="mdc fib busca selecao alta_ordem formas pilha lambdas continuacao"
-INVALIDOS="erro_char erro_string erro_indent erro_sem_colon erro_if_colon erro_alvo erro_rel"
+cabal build -v0 exe:mpyc || exit 1
+mpyc=$(cabal list-bin mpyc)
 
 ok=0
 falhas=0
 tmp=$(mktemp -d)
 
-echo "== Programas validos: os tres analisadores devem concordar"
-for f in $VALIDOS; do
-  src="exemplos/$f.mpy"
-  cabal run -v0 mpyc -- --parse-rd   "$src" > "$tmp/$f.rd"   2>&1
-  cabal run -v0 mpyc -- --parse-peg  "$src" > "$tmp/$f.peg"  2>&1
-  cabal run -v0 mpyc -- --parse-lalr "$src" > "$tmp/$f.lalr" 2>&1
-  if diff -q "$tmp/$f.rd" "$tmp/$f.peg" > /dev/null \
-     && diff -q "$tmp/$f.rd" "$tmp/$f.lalr" > /dev/null \
-     && [ -s "$tmp/$f.rd" ]; then
-    echo "  ok       $f"
-    ok=$((ok + 1))
-  else
-    echo "  FALHOU   $f"
-    falhas=$((falhas + 1))
-  fi
-done
+falhou() {
+  echo "  FALHOU   $1"
+  falhas=$((falhas + 1))
+}
 
-echo
-echo "== Programas invalidos: devem ser rejeitados pelos tres"
-for f in $INVALIDOS; do
-  src="exemplos/$f.mpy"
-  todos_rejeitam=1
-  for modo in --parse-rd --parse-peg --parse-lalr; do
-    if cabal run -v0 mpyc -- $modo "$src" > /dev/null 2>&1; then
-      todos_rejeitam=0
-    fi
-  done
-  if [ $todos_rejeitam -eq 1 ]; then
-    echo "  ok       $f"
-    echo "           $(cabal run -v0 mpyc -- --parse-rd "$src" 2>&1 | head -1)"
-    ok=$((ok + 1))
+for src in $(find exemplos -name '*.mpy' | sort); do
+  err="${src%.mpy}.err"
+  if [ -f "$err" ] && [[ "$src" != exemplos/invalid/semantic/* ]]; then
+    # Sem opcao o padrao e --parse-rd; testado tambem, porque e assim
+    # que o programa costuma ser chamado.
+    certo=1
+    for modo in "" --parse-rd --parse-peg --parse-lalr; do
+      if "$mpyc" $modo "$src" > /dev/null 2> "$tmp/err" || ! cmp -s "$tmp/err" "$err"; then
+        falhou "$src ${modo:-(sem opcao)}"
+        certo=0
+      fi
+    done
+    [ $certo -eq 1 ] && ok=$((ok + 1))
   else
-    echo "  FALHOU   $f (algum analisador aceitou)"
-    falhas=$((falhas + 1))
+    "$mpyc" --parse-rd   "$src" > "$tmp/rd"   2>&1 &&
+    "$mpyc" --parse-peg  "$src" > "$tmp/peg"  2>&1 &&
+    "$mpyc" --parse-lalr "$src" > "$tmp/lalr" 2>&1 &&
+    cmp -s "$tmp/rd" "$tmp/peg" && cmp -s "$tmp/rd" "$tmp/lalr"
+    if [ $? -eq 0 ]; then ok=$((ok + 1)); else falhou "$src"; fi
   fi
 done
 
 rm -rf "$tmp"
-echo
 echo "Total: $ok ok, $falhas falhas"
 [ $falhas -eq 0 ]

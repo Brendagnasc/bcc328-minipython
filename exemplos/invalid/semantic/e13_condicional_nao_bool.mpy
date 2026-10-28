@@ -1,0 +1,6 @@
+def main() -> None:
+    x: int = 1
+    if x:
+        print("verdadeiro")
+
+main()

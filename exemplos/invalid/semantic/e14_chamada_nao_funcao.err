@@ -1,0 +1,2 @@
+e14_chamada_nao_funcao.mpy:3:15: error: incompatible types: 'int' and '(int) -> ?0'
+

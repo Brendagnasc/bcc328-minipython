@@ -1,0 +1,29 @@
+
+def main() -> None:
+    t: bool = True
+    f: bool = False
+
+    print(str(t and t))
+    print(str(t and f))
+    print(str(f and t))
+    print(str(f and f))
+
+    print(str(t or t))
+    print(str(t or f))
+    print(str(f or t))
+    print(str(f or f))
+
+    print(str(not t))
+    print(str(not f))
+
+    print(str(t or f and f))
+    print(str(not f or f and f))
+    print(str(not (t or f)))
+
+    a: int = 5
+    b: int = 0
+    print(str(a > 0 and a < 10))
+    print(str(b == 0 or a == 0))
+    print(str(not (a == b)))
+
+main()

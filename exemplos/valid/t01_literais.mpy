@@ -1,0 +1,33 @@
+
+def main() -> None:
+    a: int = 42
+    b: int = -7
+    c: int = 1000000
+    print(str(a))
+    print(str(b))
+    print(str(c))
+
+    x: float = 3.14
+    y: float = -0.5
+    z: float = 1e10
+    print(str(x))
+    print(str(y))
+    print(str(z))
+
+    p: bool = True
+    q: bool = False
+    print(str(p))
+    print(str(q))
+
+    s1: str = "ola mundo"
+    s2: str = ""
+    s3: str = "com\nnova linha"
+    print(s1)
+    print(s2)
+    print(s3)
+
+    n: bool = True
+    if n:
+        pass
+
+main()

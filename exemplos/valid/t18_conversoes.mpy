@@ -1,0 +1,26 @@
+def main() -> None:
+    n: int = 42
+    f: float = float(n)
+    s: str = str(n)
+    b: bool = bool(n)
+    print(str(f))
+    print(s)
+    print(str(b))
+
+    x: float = 3.9
+    ni: int = int(x)
+    print(str(ni))
+
+    zero: int = 0
+    print(str(bool(zero)))
+
+    sf: str = str(2.71)
+    print(sf)
+
+    si: str = "123"
+    print(str(int(si)))
+
+    sf2: str = "9.81"
+    print(str(float(sf2)))
+
+main()

@@ -1,0 +1,44 @@
+
+def soma(a: int, b: int) -> int:
+    return a + b
+
+def produto(a: int, b: int) -> int:
+    return a * b
+
+def max2(a: int, b: int) -> int:
+    if a >= b:
+        return a
+    return b
+
+def max3(a: int, b: int, c: int) -> int:
+    return max2(a, max2(b, c))
+
+def abs_val(x: int) -> int:
+    if x < 0:
+        return -x
+    return x
+
+def saudacao(nome: str) -> str:
+    return "Ola, " + nome + "!"
+
+def eh_par(n: int) -> bool:
+    return n % 2 == 0
+
+def sem_retorno(msg: str) -> None:
+    print(msg)
+
+def main() -> None:
+    print(str(soma(3, 4)))
+    print(str(produto(6, 7)))
+    print(str(max2(10, 20)))
+    print(str(max3(5, 15, 8)))
+    print(str(abs_val(-9)))
+    print(str(abs_val(9)))
+    print(saudacao("MiniPython"))
+    print(str(eh_par(4)))
+    print(str(eh_par(7)))
+    sem_retorno("chamada sem retorno")
+
+    print(str(soma(produto(2, 3), abs_val(-4))))
+
+main()

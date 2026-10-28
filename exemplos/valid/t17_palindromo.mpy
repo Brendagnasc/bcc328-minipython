@@ -1,0 +1,19 @@
+def palindromo(s: str) -> bool:
+    n: int = len(s)
+    i: int = 0
+    while i < n // 2:
+        if s[i] != s[n - 1 - i]:
+            return False
+        i += 1
+    return True
+
+def main() -> None:
+    print(str(palindromo("radar")))
+    print(str(palindromo("arara")))
+    print(str(palindromo("python")))
+    print(str(palindromo("")))
+    print(str(palindromo("a")))
+    print(str(palindromo("ab")))
+    print(str(palindromo("aba")))
+
+main()

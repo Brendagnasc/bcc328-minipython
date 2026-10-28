@@ -1,0 +1,48 @@
+def map(f: (a) -> b, xs: list[a]) -> list[b]:
+    resultado: list[b] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def filter(p: (a) -> bool, xs: list[a]) -> list[a]:
+    resultado: list[a] = []
+    for x in xs:
+        if p(x):
+            append(resultado, x)
+    return resultado
+
+def fold(f: (b, a) -> b, acc: b, xs: list[a]) -> b:
+    for x in xs:
+        acc = f(acc, x)
+    return acc
+
+def compose(f: (b) -> c, g: (a) -> b) -> (a) -> c:
+    return lambda x: f(g(x))
+
+def multiplica_por(n: int) -> (int) -> int:
+    return lambda x: x * n
+
+nums: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+pares: list[int]     = filter(lambda x: x % 2 == 0, nums)
+impares: list[int]   = filter(lambda x: x % 2 != 0, nums)
+quadrados: list[int] = map(lambda x: x * x, nums)
+soma: int            = fold(lambda acc, x: acc + x, 0, nums)
+produto: int         = fold(lambda acc, x: acc * x, 1, nums)
+
+print(str(soma))     # 55
+print(str(produto))  # 3628800
+
+dobrar: (int) -> int        = multiplica_por(2)
+triplicar: (int) -> int     = multiplica_por(3)
+dobra_e_quadra: (int) -> int = compose(lambda x: x * x, dobrar)
+
+for x in pares:
+    print(str(dobrar(x)))
+
+print(str(dobra_e_quadra(3)))   # (3*2)^2 = 36
+
+palavras: list[str] = ["banana", "abacaxi", "laranja", "uva", "kiwi"]
+longas: list[str]   = filter(lambda s: len(s) > 4, palavras)
+for p in longas:
+    print(p)

@@ -1,0 +1,4 @@
+def soma(a: int, a: int) -> int:
+    return a + a
+
+soma(1, 2)

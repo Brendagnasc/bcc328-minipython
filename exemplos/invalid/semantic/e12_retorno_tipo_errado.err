@@ -1,0 +1,2 @@
+e12_retorno_tipo_errado.mpy:2:5: error: incompatible types: 'int' and 'str'
+

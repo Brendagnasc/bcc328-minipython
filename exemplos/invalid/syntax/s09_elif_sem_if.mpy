@@ -1,0 +1,6 @@
+def main() -> None:
+    x: int = 5
+    elif x > 3:
+        print("maior")
+
+main()

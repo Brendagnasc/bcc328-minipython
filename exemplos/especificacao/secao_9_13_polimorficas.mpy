@@ -1,0 +1,22 @@
+def identidade(x: a) -> a:
+    return x
+
+def aplica(f: (a) -> b, x: a) -> b:
+    return f(x)
+
+def compose(f: (b) -> c, g: (a) -> b, x: a) -> c:
+    return f(g(x))
+
+def dobro(n: int) -> int:
+    return n * 2
+
+def para_str(n: int) -> str:
+    return str(n)
+
+n: int = identidade(42)
+s: str = identidade("olá")
+resultado: str = aplica(para_str, aplica(dobro, 5))
+print(resultado)
+
+dobrado: int = compose(dobro, dobro, 3)
+print(str(dobrado))

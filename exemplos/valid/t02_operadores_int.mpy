@@ -1,0 +1,33 @@
+
+def main() -> None:
+    a: int = 17
+    b: int = 5
+
+    print(str(a + b))
+    print(str(a - b))
+    print(str(a * b))
+    print(str(a // b))
+    print(str(a % b))
+    print(str(a / b))
+    print(str(a ** b))
+
+    print(str(a == b))
+    print(str(a != b))
+    print(str(a < b))
+    print(str(a <= b))
+    print(str(a > b))
+    print(str(a >= b))
+
+    c: int = 10
+    c += 3
+    print(str(c))
+    c -= 1
+    print(str(c))
+    c *= 2
+    print(str(c))
+    c //= 4
+    print(str(c))
+    c %= 3
+    print(str(c))
+
+main()

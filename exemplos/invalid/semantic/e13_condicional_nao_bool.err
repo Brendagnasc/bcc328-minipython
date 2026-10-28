@@ -1,0 +1,2 @@
+e13_condicional_nao_bool.mpy:3:8: error: incompatible types: 'bool' and 'int'
+

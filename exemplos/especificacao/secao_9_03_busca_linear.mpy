@@ -1,0 +1,23 @@
+def busca(arr: list[int], val: int) -> int:
+    i: int = 0
+    while i < len(arr):
+        if arr[i] == val:
+            return i
+        i += 1
+    return -1
+
+def main() -> None:
+    n: int = int(input())
+    arr: list[int] = []
+    i: int = 0
+    while i < n:
+        append(arr, int(input()))
+        i += 1
+    val: int = int(input())
+    pos: int = busca(arr, val)
+    if pos >= 0:
+        print("Encontrado na posicao " + str(pos))
+    else:
+        print("Nao encontrado")
+
+main()

@@ -1,0 +1,18 @@
+def classifica(imc: float) -> str:
+    if imc < 18.5:
+        return "Abaixo do peso"
+    elif imc < 25.0:
+        return "Peso normal"
+    elif imc < 30.0:
+        return "Sobrepeso"
+    else:
+        return "Obesidade"
+
+def main() -> None:
+    peso: float = float(input())
+    altura: float = float(input())
+    imc: float = peso / (altura * altura)
+    print("IMC: " + str(imc))
+    print(classifica(imc))
+
+main()

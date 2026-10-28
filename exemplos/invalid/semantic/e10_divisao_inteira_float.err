@@ -1,0 +1,2 @@
+e10_divisao_inteira_float.mpy:4:16: error: operator '//' requires 'int' operands, got 'float' and 'int'
+

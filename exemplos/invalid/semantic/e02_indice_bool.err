@@ -1,0 +1,2 @@
+e02_indice_bool.mpy:3:16: error: index must be 'int', got 'bool'
+

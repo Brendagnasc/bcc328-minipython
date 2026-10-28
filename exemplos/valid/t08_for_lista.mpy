@@ -1,0 +1,41 @@
+
+def soma_lista(xs: list[int]) -> int:
+    s: int = 0
+    for x in xs:
+        s += x
+    return s
+
+def main() -> None:
+    nums: list[int] = [10, 20, 30, 40, 50]
+
+    for n in nums:
+        print(str(n))
+
+    print(str(len(nums)))
+    print(str(nums[0]))
+    print(str(nums[4]))
+
+    nums[2] = 99
+    print(str(nums[2]))
+
+    append(nums, 60)
+    print(str(len(nums)))
+    print(str(nums[5]))
+
+    print(str(soma_lista(nums)))
+
+    fs: list[float] = [1.1, 2.2, 3.3]
+    total: float = 0.0
+    for f in fs:
+        total += f
+    print(str(total))
+
+    palavras: list[str] = ["ola", "mundo", "python"]
+    for p in palavras:
+        print(p)
+
+    flags: list[bool] = [True, False, True]
+    for b in flags:
+        print(str(b))
+
+main()

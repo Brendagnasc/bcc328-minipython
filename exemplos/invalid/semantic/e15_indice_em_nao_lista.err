@@ -1,0 +1,2 @@
+e15_indice_em_nao_lista.mpy:3:15: error: indexing requires 'list[T]' or 'str', got 'int'
+

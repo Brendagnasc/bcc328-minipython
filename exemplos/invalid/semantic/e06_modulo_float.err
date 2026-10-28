@@ -1,0 +1,3 @@
+e06_modulo_float.mpy:4:18: error: operator '%' requires 'int' operands, got 'float' and 'float'
+e06_modulo_float.mpy:4:5: error: incompatible types: 'float' and 'int'
+

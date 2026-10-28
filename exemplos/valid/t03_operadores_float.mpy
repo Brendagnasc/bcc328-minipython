@@ -1,0 +1,29 @@
+
+def main() -> None:
+    a: float = 7.5
+    b: float = 2.5
+
+    print(str(a + b))
+    print(str(a - b))
+    print(str(a * b))
+    print(str(a / b))
+
+    print(str(a > b))
+    print(str(a == b))
+    print(str(a < b))
+    print(str(a >= b))
+    print(str(a != b))
+
+    r: float = 2.0 ** 10.0
+    print(str(r))
+
+    n: int = 5
+    f: float = float(n)
+    print(str(f))
+
+    pi: float = 3.14159
+    raio: float = 4.0
+    area: float = pi * raio * raio
+    print(str(area))
+
+main()

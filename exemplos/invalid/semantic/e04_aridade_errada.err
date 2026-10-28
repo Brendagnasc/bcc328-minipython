@@ -1,0 +1,2 @@
+e04_aridade_errada.mpy:5:19: error: incompatible types: '(int, int) -> int' and '(int, int, int) -> ?0'
+

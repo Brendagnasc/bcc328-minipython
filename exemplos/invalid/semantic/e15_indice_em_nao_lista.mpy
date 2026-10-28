@@ -1,0 +1,6 @@
+def main() -> None:
+    x: int = 42
+    v: int = x[0]
+    print(str(v))
+
+main()

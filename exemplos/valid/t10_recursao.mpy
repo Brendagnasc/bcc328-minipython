@@ -1,0 +1,37 @@
+
+def fatorial(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * fatorial(n - 1)
+
+def fib(n: int) -> int:
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+def potencia(base: int, exp: int) -> int:
+    if exp == 0:
+        return 1
+    if exp % 2 == 0:
+        metade: int = potencia(base, exp // 2)
+        return metade * metade
+    return base * potencia(base, exp - 1)
+
+def soma_digitos(n: int) -> int:
+    if n < 10:
+        return n
+    return n % 10 + soma_digitos(n // 10)
+
+def main() -> None:
+    for i in range(11):
+        print(str(fatorial(i)))
+
+    for i in range(11):
+        print(str(fib(i)))
+
+    print(str(potencia(2, 10)))
+    print(str(potencia(3, 5)))
+
+    print(str(soma_digitos(12345)))
+
+main()

@@ -1,0 +1,4 @@
+def f(x: int) -> int:
+    return str(x)
+
+f(3)

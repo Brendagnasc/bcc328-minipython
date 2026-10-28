@@ -1,0 +1,33 @@
+class Forma:
+    def area(self) -> float:
+        return 0.0
+    def perimetro(self) -> float:
+        return 0.0
+    def descricao(self) -> str:
+        return "area=" + str(self.area()) + " perimetro=" + str(self.perimetro())
+
+class Retangulo(Forma):
+    largura: float
+    altura: float
+    def __init__(self, largura: float, altura: float) -> None:
+        self.largura = largura
+        self.altura = altura
+    def area(self) -> float:
+        return self.largura * self.altura
+    def perimetro(self) -> float:
+        return 2.0 * (self.largura + self.altura)
+
+class Quadrado(Retangulo):
+    def __init__(self, lado: float) -> None:
+        Retangulo.__init__(self, lado, lado)
+
+def imprimir(f: Forma) -> None:
+    print(f.descricao())
+
+def main() -> None:
+    r: Retangulo = Retangulo(3.0, 4.0)
+    q: Quadrado = Quadrado(5.0)
+    imprimir(r)
+    imprimir(q)
+
+main()

@@ -1,0 +1,2 @@
+e07_comparacao_tipos_incompativeis.mpy:4:10: error: operator '==' requires operands of the same type, got 'int' and 'str'
+

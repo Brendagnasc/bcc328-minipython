@@ -1,0 +1,6 @@
+def main() -> None:
+    xs: list[int] = [1, 2, 3]
+    v: int = xs[True]
+    print(str(v))
+
+main()

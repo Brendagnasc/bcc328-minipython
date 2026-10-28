@@ -1,0 +1,2 @@
+e11_atribuicao_tipo_errado.mpy:3:5: error: incompatible types: 'int' and 'float'
+

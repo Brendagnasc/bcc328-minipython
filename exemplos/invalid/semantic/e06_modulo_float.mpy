@@ -1,0 +1,7 @@
+def main() -> None:
+    x: float = 7.5
+    y: float = 2.5
+    r: float = x % y
+    print(str(r))
+
+main()

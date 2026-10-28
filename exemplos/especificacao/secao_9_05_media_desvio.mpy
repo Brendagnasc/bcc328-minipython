@@ -1,0 +1,28 @@
+def soma(xs: list[float]) -> float:
+    s: float = 0.0
+    for x in xs:
+        s = s + x
+    return s
+
+def media(xs: list[float]) -> float:
+    return soma(xs) / float(len(xs))
+
+def desvio(xs: list[float]) -> float:
+    m: float = media(xs)
+    s: float = 0.0
+    for x in xs:
+        d: float = x - m
+        s = s + d * d
+    return s / float(len(xs))
+
+def main() -> None:
+    n: int = int(input())
+    xs: list[float] = []
+    i: int = 0
+    while i < n:
+        append(xs, float(input()))
+        i += 1
+    print("media: " + str(media(xs)))
+    print("variancia: " + str(desvio(xs)))
+
+main()

@@ -1,0 +1,18 @@
+def palindromo(s: str) -> bool:
+    n: int = len(s)
+    i: int = 0
+    ok: bool = True
+    while i < n // 2:
+        if s[i] != s[n - 1 - i]:
+            ok = False
+        i += 1
+    return ok
+
+def main() -> None:
+    s: str = input()
+    if palindromo(s):
+        print("palindromo")
+    else:
+        print("nao e palindromo")
+
+main()

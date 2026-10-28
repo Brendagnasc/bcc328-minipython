@@ -1,0 +1,56 @@
+
+def inverte(xs: list[int]) -> list[int]:
+    resultado: list[int] = []
+    i: int = len(xs) - 1
+    while i >= 0:
+        append(resultado, xs[i])
+        i -= 1
+    return resultado
+
+def copia(xs: list[int]) -> list[int]:
+    copia_local: list[int] = []
+    for x in xs:
+        append(copia_local, x)
+    return copia_local
+
+def contem(xs: list[int], val: int) -> bool:
+    for x in xs:
+        if x == val:
+            return True
+    return False
+
+def main() -> None:
+    xs: list[int] = []
+    append(xs, 1)
+    append(xs, 2)
+    append(xs, 3)
+    print(str(len(xs)))
+    print(str(xs[0]))
+    print(str(xs[2]))
+
+    xs[1] = 99
+    print(str(xs[1]))
+
+    for x in xs:
+        print(str(x))
+
+    ys: list[int] = [5, 4, 3, 2, 1]
+    inv: list[int] = inverte(ys)
+    for x in inv:
+        print(str(x))
+
+    a: list[int] = [10, 20, 30]
+    b: list[int] = copia(a)
+    b[0] = 99
+    print(str(a[0]))
+    print(str(b[0]))
+
+    print(str(contem(ys, 3)))
+    print(str(contem(ys, 9)))
+
+    mat: list[list[int]] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    for linha in mat:
+        for elem in linha:
+            print(str(elem))
+
+main()

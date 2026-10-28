@@ -1,0 +1,24 @@
+class Pilha:
+    dados: list[int]
+    topo: int
+    def __init__(self) -> None:
+        self.dados = []
+        self.topo = 0
+    def push(self, x: int) -> None:
+        append(self.dados, x)
+        self.topo = self.topo + 1
+    def pop(self) -> int:
+        self.topo = self.topo - 1
+        return self.dados[self.topo]
+    def vazia(self) -> bool:
+        return self.topo == 0
+
+def main() -> None:
+    p: Pilha = Pilha()
+    p.push(10)
+    p.push(20)
+    p.push(30)
+    while not p.vazia():
+        print(str(p.pop()))
+
+main()

@@ -1,0 +1,2 @@
+e08_append_tipo_errado.mpy:3:11: error: incompatible types: 'int' and 'str'
+

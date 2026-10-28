@@ -1,0 +1,37 @@
+def classifica_imc(imc: float) -> str:
+    if imc < 18.5:
+        return "abaixo do peso"
+    elif imc < 25.0:
+        return "peso normal"
+    elif imc < 30.0:
+        return "sobrepeso"
+    else:
+        return "obesidade"
+
+def media(xs: list[float]) -> float:
+    s: float = 0.0
+    for x in xs:
+        s = s + x
+    return s / float(len(xs))
+
+def main() -> None:
+    pi: float = 3.14159
+    r: float = 5.0
+    area: float = pi * r * r
+    circ: float = 2.0 * pi * r
+    print(str(area))
+    print(str(circ))
+
+    peso: float = 70.0
+    altura: float = 1.75
+    imc: float = peso / (altura * altura)
+    print(str(imc))
+    print(classifica_imc(imc))
+
+    notas: list[float] = [7.5, 8.0, 9.5, 6.0, 8.5]
+    print(str(media(notas)))
+
+    print(str(2.0 ** 0.5))
+    print(str(float(10) / float(3)))
+
+main()

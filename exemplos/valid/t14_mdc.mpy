@@ -1,0 +1,15 @@
+def mdc(a: int, b: int) -> int:
+    while b != 0:
+        t: int = b
+        b = a % b
+        a = t
+    return a
+
+def main() -> None:
+    print(str(mdc(48, 18)))
+    print(str(mdc(100, 75)))
+    print(str(mdc(17, 13)))
+    print(str(mdc(0, 5)))
+    print(str(mdc(7, 7)))
+
+main()

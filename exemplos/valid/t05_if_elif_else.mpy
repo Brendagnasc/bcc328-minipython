@@ -1,0 +1,50 @@
+
+def classifica_nota(n: int) -> str:
+    if n >= 90:
+        return "A"
+    elif n >= 80:
+        return "B"
+    elif n >= 70:
+        return "C"
+    elif n >= 60:
+        return "D"
+    else:
+        return "F"
+
+def sinal(x: int) -> str:
+    if x > 0:
+        return "positivo"
+    elif x < 0:
+        return "negativo"
+    else:
+        return "zero"
+
+def main() -> None:
+    print(classifica_nota(95))
+    print(classifica_nota(83))
+    print(classifica_nota(72))
+    print(classifica_nota(65))
+    print(classifica_nota(40))
+
+    print(sinal(10))
+    print(sinal(-3))
+    print(sinal(0))
+
+    x: int = 7
+    if x > 5:
+        print("maior que 5")
+
+    a: int = 3
+    b: int = 7
+    if a < b:
+        if a > 0:
+            print("a entre 0 e b")
+        else:
+            print("a negativo e menor que b")
+    else:
+        print("a >= b")
+
+    resultado: str = "par" if x % 2 == 0 else "impar"
+    print(resultado)
+
+main()

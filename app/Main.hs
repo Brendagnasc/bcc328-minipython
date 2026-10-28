@@ -5,7 +5,6 @@ import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import MiniPython.CLI (Mode (..), Options (..), parseArgs, usage)
 import MiniPython.Frontend.Lexer.Indent (layout)
 import MiniPython.Frontend.Lexer.MiniPythonLexer (renderToken, scan)
-import MiniPython.Frontend.Lexer.Token (Token)
 import MiniPython.Frontend.Parser.Happy.Grammar (parseProgramLALR)
 import MiniPython.Frontend.Parser.PEG (parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
@@ -16,7 +15,7 @@ import MiniPython.Utils.Error (Error, formatError)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath (takeFileName)
-import System.IO (hPutStrLn, hSetEncoding, stderr, stdout)
+import System.IO (hPutStr, hPutStrLn, hSetEncoding, stderr, stdout)
 
 main :: IO ()
 main = do
@@ -30,7 +29,7 @@ main = do
     ShowHelp -> putStr usage >> exitSuccess
     BadUsage msg -> do
       hPutStrLn stderr ("erro: " ++ msg)
-      hPutStrLn stderr usage
+      hPutStr stderr usage
       exitFailure
     Run mode file -> do
       src <- readFile file
@@ -38,27 +37,23 @@ main = do
 
 run :: Mode -> FilePath -> String -> IO ()
 run mode file src = do
-  toks <- tokenize file src
+  -- O lexer roda em todos os modos, inclusive no PEG, que le o texto
+  -- direto: assim os erros lexicos saem iguais nos tres.
+  toks <- orAbort file (scan src >>= layout)
   case mode of
-    Lex -> mapM_ (putStrLn . renderToken) toks
-    ParseRD -> printAst (parseProgram toks)
-    ParsePEG -> printAst (parseProgramPEG src toks)
-    ParseLALR -> case parseProgramLALR toks of
-      Left msg  -> abort (file ++ ":" ++ msg)
-      Right ast -> printAst (Right ast)
+    Lex       -> mapM_ (putStrLn . renderToken) toks
+    ParseRD   -> printAst (parseProgram toks)
+    ParsePEG  -> printAst (parseProgramPEG src toks)
+    ParseLALR -> printAst (parseProgramLALR toks)
   where
     printAst :: Either Error Program -> IO ()
-    printAst result = case result >>= validate of
-      Left e     -> abort (formatError (takeFileName file) e)
-      Right prog -> putStrLn (drawTree (toTree prog))
+    printAst result = do
+      prog <- orAbort file (result >>= validate)
+      putStrLn (drawTree (toTree prog))
 
--- | Executa o analisador lexico com a camada de indentacao, abortando
--- com mensagem posicionada em caso de erro. Como nos arquivos .err, a
+-- | Imprime o erro em stderr e encerra. Como nos arquivos .err, a
 -- mensagem leva so o nome do arquivo, sem o diretorio.
-tokenize :: FilePath -> String -> IO [Token]
-tokenize file src = case scan src >>= layout of
-  Left err   -> abort (formatError (takeFileName file) err)
-  Right toks -> pure toks
-
-abort :: String -> IO a
-abort msg = hPutStrLn stderr msg >> exitFailure
+orAbort :: FilePath -> Either Error a -> IO a
+orAbort file = either abort pure
+  where
+    abort e = hPutStrLn stderr (formatError (takeFileName file) e) >> exitFailure

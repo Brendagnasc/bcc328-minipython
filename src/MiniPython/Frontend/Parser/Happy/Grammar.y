@@ -14,18 +14,25 @@
 -- sao declaradas pelas diretivas %left, %right e %nonassoc, conforme
 -- exigido na secao 5 do enunciado. A linguagem reconhecida e a mesma,
 -- e a AST produzida e identica a dos demais analisadores.
+--
+-- Os erros saem no formato dos arquivos .err; as acoes que podem
+-- falhar (alvo de atribuicao, parametro repetido, tipo lista) usam a
+-- monada Either Error com {% ... }.
 module MiniPython.Frontend.Parser.Happy.Grammar
   ( parseProgramLALR
   ) where
 
 import MiniPython.Frontend.Lexer.Token
 import MiniPython.Frontend.Syntax.MiniPythonSyntax
+import MiniPython.Frontend.Syntax.Validate (duplicateParam)
+import MiniPython.Utils.Error
 }
 
 %name pProgram Programa
 %tokentype { Token }
 %error     { parseError }
-%monad     { Either String }
+%errorhandlertype explist
+%monad     { Either Error }
 
 %token
   int_lit   { Token (TkIntLit _) _ }
@@ -99,16 +106,19 @@ import MiniPython.Frontend.Syntax.MiniPythonSyntax
 -- operador apos o corpo, o parser desloca em vez de reduzir, de modo
 -- que lambda x: x + 1 seja a funcao que soma 1, e nao a lambda
 -- somada a 1. O corpo e uma expressao unica (secao 6.11).
+-- NEG vem depois de '**' porque o menos unario liga mais forte:
+-- -2 ** 2 e (-2) ** 2. A condicional associa a direita, como na GLC:
+-- a if b else c if d else e e a if b else (c if d else e).
 %nonassoc LAMBDA
-%nonassoc 'if' 'else'
+%right 'if' 'else'
 %left 'or'
 %left 'and'
 %right 'not'
 %nonassoc '==' '!=' '<' '<=' '>' '>='
 %left '+' '-'
 %left '*' '/' '//' '%'
-%right NEG
 %right '**'
+%right NEG
 %left '.' '[' '('
 
 %%
@@ -126,8 +136,13 @@ Decl :: { Decl }
   | Comando                         { DStmt $1 }
 
 DefFuncao :: { FunDef }
-  : 'def' ident '(' Params ')' Retorno ':' Bloco
-      { FunDef (tokPos $1) (identName $2) (reverse $4) $6 $8 }
+  : 'def' ident ListaParams Retorno ':' Bloco
+      { FunDef (tokPos $1) (identName $2) $3 $4 $6 }
+
+-- A lista e reduzida logo depois do ')', antes do corpo, de modo que o
+-- parametro repetido e apontado no mesmo ponto que nos outros parsers.
+ListaParams :: { [Param] }
+  : '(' Params ')'                  {% checkParams $3 (reverse $2) }
 
 Retorno :: { Maybe Type }
   : {- vazio -}                     { Nothing }
@@ -147,8 +162,13 @@ Param :: { Param }
   | ident ':' Tipo                  { Param (tokPos $1) (identName $1) (Just $3) }
 
 DefClasse :: { ClassDef }
-  : 'class' ident Super ':' NEWLINE INDENT Campos Metodos DEDENT
+  : 'class' ident Super ':' NEWLINE INDENT Campos Metodos Passe DEDENT
       { ClassDef (tokPos $1) (identName $2) $3 (reverse $7) (reverse $8) }
+
+-- Corpo de classe vazio, escrito com pass, como no parser descendente.
+Passe :: { () }
+  : {- vazio -}                     { () }
+  | 'pass' NEWLINE                  { () }
 
 Super :: { Maybe Name }
   : {- vazio -}                     { Nothing }
@@ -214,7 +234,7 @@ Tipo :: { Type }
   | 'bool'                          { TyBool (tokPos $1) }
   | 'str'                           { TyStr (tokPos $1) }
   | 'None'                          { TyNone (tokPos $1) }
-  | ident '[' Tipo ']'              { TyList (tokPos $1) $3 }
+  | ident '[' Tipo ']'              {% mkListType $1 $2 $3 }
   | ident                           { mkNameType $1 }
   | '(' Tipos ')' '->' Tipo         { TyFun (tokPos $1) (reverse $2) $5 }
 
@@ -288,15 +308,42 @@ Atomo :: { Expr }
 
 {
 -- | Reconhece um programa completo a partir da lista de tokens.
-parseProgramLALR :: [Token] -> Either String Program
+parseProgramLALR :: [Token] -> Either Error Program
 parseProgramLALR = pProgram
 
-parseError :: [Token] -> Either String a
-parseError [] = Left "erro sintatico: fim inesperado da entrada"
-parseError (t : _) =
-  Left ( show (posLine (tokPos t)) ++ ":" ++ show (posCol (tokPos t))
-       ++ ": erro sintatico: token inesperado "
-       ++ describeLexeme (tokLexeme t) )
+-- | Com %errorhandlertype explist o Happy entrega, alem dos tokens
+-- restantes, os terminais que o estado aceitaria, com os nomes da
+-- secao %token. Um estado LALR costuma aceitar muitos; a mensagem usa
+-- o mais informativo, na mesma ordem de prioridade para todo erro:
+-- ':' (fim de cabecalho), INDENT (inicio de bloco), qualquer inicio de
+-- expressao (int_lit so e aceito onde uma expressao pode comecar) e
+-- NEWLINE. Fora isso, vale o primeiro terminal que nao seja operador,
+-- ja que os operadores so continuam a expressao anterior. Assim os
+-- erros saem iguais aos do descendente recursivo.
+parseError :: ([Token], [String]) -> Either Error a
+parseError (toks, esperados) =
+  Left (Error (tokPos t) ("expected " ++ oQue ++ ", got " ++ describeLexeme (tokLexeme t)))
+  where
+    t = case toks of
+      (x : _) -> x
+      []      -> Token TkEOF initialPos
+    oQue
+      | "':'" `elem` esperados     = "':'"
+      | "INDENT" `elem` esperados  = expectedLexeme TkIndent
+      | "int_lit" `elem` esperados = "expression"
+      | "NEWLINE" `elem` esperados = "NEWLINE"
+      | (e : _) <- filter (`notElem` operadores) esperados ++ esperados =
+          if e == "ident" then "identifier" else e
+      | otherwise                  = "EOF"
+    operadores =
+      [ "'or'", "'and'", "'if'", "'=='", "'!='", "'<'", "'<='", "'>'", "'>='"
+      , "'+'", "'-'", "'*'", "'/'", "'//'", "'%'", "'**'", "'('", "'['", "'.'" ]
+
+-- | Parametros repetidos sao recusados no ')' que fecha a lista.
+checkParams :: Token -> [Param] -> Either Error [Param]
+checkParams fecha ps = case duplicateParam ps of
+  Just n  -> Left (Error (tokPos fecha) ("duplicate parameter: '" ++ n ++ "'"))
+  Nothing -> Right ps
 
 identName :: Token -> Name
 identName t = case tokLexeme t of
@@ -327,30 +374,36 @@ mkBool t = case tokLexeme t of
 -- demais sao variaveis de tipo (secao 3.5 da especificacao).
 mkNameType :: Token -> Type
 mkNameType t = case tokLexeme t of
-  TkIdent n
-    | not (null n) && head n `elem` ['A' .. 'Z'] -> TyClass (tokPos t) n
+  TkIdent n@(c : _)
+    | c `elem` ['A' .. 'Z'] -> TyClass (tokPos t) n
     | otherwise -> TyVar (tokPos t) n
   _ -> error "mkNameType"
+
+-- | So list recebe argumento de tipo entre colchetes.
+mkListType :: Token -> Token -> Type -> Either Error Type
+mkListType nome colchete elemT = case tokLexeme nome of
+  TkIdent "list" -> Right (TyList (tokPos nome) elemT)
+  TkIdent n -> Left (Error (tokPos colchete) ("unexpected '[' after type '" ++ n ++ "'"))
+  _ -> error "mkListType"
 
 -- | Converte a expressao a esquerda do '=' em alvo de atribuicao.
 -- Mesma estrategia dos demais analisadores: a producao aceita uma
 -- expressao qualquer e a restricao a alvos validos e aplicada na
 -- acao semantica.
-mkAssign :: Expr -> Expr -> Either String Stmt
+mkAssign :: Expr -> Expr -> Either Error Stmt
 mkAssign alvo val = do
   lv <- toLValue alvo
   pure (SAssign (exprPos alvo) lv val)
 
-mkAugAssign :: Expr -> AugOp -> Expr -> Either String Stmt
+mkAugAssign :: Expr -> AugOp -> Expr -> Either Error Stmt
 mkAugAssign alvo op val = do
   lv <- toLValue alvo
   pure (SAugAssign (exprPos alvo) lv op val)
 
-toLValue :: Expr -> Either String LValue
+toLValue :: Expr -> Either Error LValue
 toLValue e = case e of
   EVar p n     -> Right (LVar p n)
   EIndex p b i -> Right (LIndex p b i)
   EField p b n -> Right (LField p b n)
-  _ -> Left ( show (posLine (exprPos e)) ++ ":" ++ show (posCol (exprPos e))
-            ++ ": erro sintatico: alvo de atribuicao invalido" )
+  _            -> Left (Error (exprPos e) "invalid assignment target")
 }

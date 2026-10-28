@@ -17,8 +17,7 @@ delimitam blocos como as chaves de linguagens baseadas em C.
 
     Programa     ::= { Decl } EOF
 
-    Decl         ::= DefFuncao
-                   | DefClasse
+    Decl         ::= DefClasse
                    | Comando
 
     DefFuncao    ::= 'def' IDENT '(' [ Params ] ')' [ '->' Tipo ] ':' Bloco
@@ -39,6 +38,14 @@ delimitam blocos como as chaves de linguagens baseadas em C.
 `Param`. Os campos de uma classe precedem os métodos, conforme a seção
 6.3 da especificação. Uma classe sem campos e sem métodos tem como
 corpo o comando `pass`, que não vai para a AST.
+
+Uma `DefFuncao` é também um comando (ver `ComandoComposto`), porque a
+regra 19 da seção 10 da especificação prevê funções locais, definidas
+dentro do corpo de outra. Por isso `Decl` não repete `DefFuncao`: se
+repetisse, uma definição de nível superior teria duas derivações. Na
+AST, a definição de nível superior vira `DFun` e a local vira o comando
+`SFunDef`, porque só as de nível superior são generalizadas na
+inferência de tipos.
 
 ## Tipos
 
@@ -83,6 +90,7 @@ tipo (seção 3.5 da especificação).
                  ::= ComandoIf
                    | ComandoWhile
                    | ComandoFor
+                   | DefFuncao
 
     ComandoIf    ::= 'if' Expr ':' Bloco
                      { 'elif' Expr ':' Bloco }
@@ -102,7 +110,8 @@ A estratificação em níveis codifica a precedência e a associatividade
 dos operadores diretamente na forma das produções, tornando a
 gramática não ambígua sem necessidade de declarações externas.
 
-    Expr         ::= ExprOu [ 'if' ExprOu 'else' Expr ]
+    Expr         ::= 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
+                   | ExprOu [ 'if' ExprOu 'else' Expr ]
 
     ExprOu       ::= ExprE { 'or' ExprE }
 
@@ -141,7 +150,6 @@ gramática não ambígua sem necessidade de declarações externas.
                    | IDENT
                    | 'int' | 'float' | 'str' | 'bool'
                    | '[' [ Args ] ']'
-                   | 'lambda' [ IDENT { ',' IDENT } ] ':' Expr
                    | '(' Expr ')'
 
 Em posição de expressão, `int`, `float`, `str` e `bool` são as funções
@@ -153,6 +161,7 @@ Da menor para a maior:
 
 | Nível | Operadores | Associatividade |
 |---|---|---|
+| 0 | `lambda` (o corpo vai até o fim da expressão) | prefixo |
 | 1 | `if ... else` (expressão condicional) | direita |
 | 2 | `or` | esquerda |
 | 3 | `and` | esquerda |
@@ -187,10 +196,25 @@ O encadeamento de comparações do Python não faz parte do MiniPython.
 direita no segundo operando, de modo que `2 ** 3 ** 2` é lido como
 `2 ** (3 ** 2)`.
 
-**Lambda como átomo.** A seção 3 do enunciado determina que expressões
-lambda são expressões primárias. O corpo é uma única `Expr`, o que
-permite `lambda x: x if x > 0 else -x` sem ambiguidade, já que a
-expressão condicional é consumida inteira como corpo.
+**Lambda no nível de `Expr`.** A seção 3 do enunciado chama as lambdas
+de expressões primárias, e a primeira versão desta gramática as punha
+em `Atomo`. Com o corpo sendo uma `Expr` completa, porém, a gramática
+ficava ambígua: `lambda x: x + 1` tinha duas árvores, com a soma dentro
+do corpo ou fora dele (somando 1 à lambda). Os parsers escolhiam a
+primeira por construção, mas a GLC não. A lambda passou para o nível de
+`Expr`, como em Python e na gramática MiniPython de exemplo da
+typed-peg: o corpo vai até o fim da expressão, e `lambda x: x + 1` tem
+uma árvore só. A lambda continua valendo em qualquer posição onde cabe
+uma `Expr` completa (argumento, elemento de lista, valor de atribuição,
+`return`, ramo `else`, corpo de outra lambda); como operando de outro
+operador, ela precisa de parênteses: `1 + lambda: 2` é erro de sintaxe,
+`(lambda x: x)(3)` não é.
+
+**Condicional.** A condição e o valor de `a if c else b` são `ExprOu`,
+e só o ramo `else` é uma `Expr`. Por isso a condicional associa à
+direita (`a if b else c if d else e` é `a if b else (c if d else e)`), e
+uma condicional ou uma lambda na condição precisa de parênteses:
+`1 if 2 if 3 else 4 else 5` é erro de sintaxe.
 
 **Literal de lista e indexação.** O colchete inicia um literal de
 lista quando aparece em posição de átomo, e um acesso indexado quando
@@ -240,7 +264,7 @@ seguido de `fy`.
     Suite        <- FimLinha Ind Bloco
     Bloco        <- (|Comando| (Ind |Comando|)*)^>
 
-    Comando      <- ComandoIf / ComandoWhile / ComandoFor
+    Comando      <- DefFuncao / ComandoIf / ComandoWhile / ComandoFor
                   / ComandoSimples FimLinha
 
     ComandoIf    <- 'if' Expr ':' Suite
@@ -259,7 +283,8 @@ seguido de `fy`.
                   / '(' ((Tipo (',' Tipo)*)? ')')_~ '->' Tipo
                   / Nome ('[' (Tipo ']')_~)?
 
-    Expr         <- ExprOu ('if' ExprOu 'else' Expr)?
+    Expr         <- 'lambda' (Nome (',' Nome)*)? ':' Expr
+                  / ExprOu ('if' ExprOu 'else' Expr)?
     ExprOu       <- ExprE ('or' ExprE)*
     ExprE        <- ExprNao ('and' ExprNao)*
     ExprNao      <- 'not' ExprNao / ExprRel
@@ -279,7 +304,6 @@ seguido de `fy`.
                   / 'int' / 'float' / 'str' / 'bool'
                   / Nome / Numero / String
                   / '[' (Args ']')_~
-                  / 'lambda' (Nome (',' Nome)*)? ':' Expr
                   / '(' (Expr ')')_~
 
     EspacoLinha  <- ([ \t\r] / '#' [^\n]*)*
@@ -294,7 +318,8 @@ seguido de `fy`.
                     / 'elif' / 'else' / 'False' / 'float' / 'for' / 'if' / 'int'
                     / 'in' / 'lambda' / 'None' / 'not' / 'or' / 'pass'
                     / 'return' / 'self' / 'str' / 'True' / 'while') ![a-zA-Z0-9_]
-    Numero       <- [0-9] [0-9_]* ('.' [0-9] [0-9_]*)? ([eE] [+-]? [0-9]+)?
+    Numero       <- Digitos ('.' Digitos)? ([eE] [+-]? Digitos)?
+    Digitos      <- [0-9] ('_'? [0-9])*
     String       <- '"' (Escape / [^"\\\n])* '"'
                   / '\'' (Escape / [^'\\\n])* '\''
     Escape       <- '\\' [ntr\\"']
@@ -376,13 +401,11 @@ fim do arquivo.
 
 ## Adaptação para o Happy e conflitos shift/reduce
 
-Conforme a seção 5 do enunciado, as produções de expressão **não são
-estratificadas** na especificação do Happy. Há uma única produção
-`Expr` com todos os operadores, e a precedência e a associatividade
-são declaradas por diretivas:
+Conforme a seção 5 do enunciado, os operadores **não são
+estratificados** na especificação do Happy: há uma única produção,
+`Operacao`, com todos eles, e a precedência e a associatividade são
+declaradas por diretivas:
 
-    %nonassoc LAMBDA
-    %right    'if' 'else'
     %left     'or'
     %left     'and'
     %right    'not'
@@ -391,67 +414,76 @@ são declaradas por diretivas:
     %left     '*' '/' '//' '%'
     %right    '**'
     %right    NEG
-    %left     '.' '[' '('
 
 A ordem das declarações é da menor para a maior precedência. O
 pseudo-token `NEG` distingue o menos unário do binário, declarado com
 `%prec NEG` na produção correspondente, e fica acima de `'**'`, como
 na GLC. O `%nonassoc` nos operadores relacionais produz o mesmo efeito
-da produção não recursiva da GLC: `a < b < c` é rejeitado.
+da produção não recursiva da GLC: `a < b < c` é rejeitado. Os
+pós-fixos (chamada, indexação e acesso a campo) ficam em `Posfixa` e
+não precisam de diretiva.
 
-A condicional é `%right` porque o ramo `else` da GLC é uma `Expr`
-completa: `a if b else c if d else e` é `a if b else (c if d else e)`.
-Na primeira versão ela estava como `%nonassoc`, e o LALR recusava essa
-entrada, que os outros dois parsers aceitam.
+A lambda e a condicional ficam numa produção à parte, como na GLC:
+
+    Expr : 'lambda' LambdaParams ':' Expr
+         | Operacao 'if' Operacao 'else' Expr
+         | Operacao
+
+A condição e o valor da condicional são `Operacao`, então não podem
+ser, sem parênteses, outra condicional nem uma lambda. Isso não tem
+como ser dito com diretivas de precedência: depois de `1 if 2`, diante
+de outro `if`, o único movimento possível é deslocar, e sem conflito
+não há o que a precedência decidir. Numa versão anterior, com uma
+produção `Expr` só para tudo, o LALR aceitava `1 if 2 if 3 else 4 else
+5`, que a GLC e os outros dois parsers recusam.
 
 Como o analisador léxico já insere INDENT e DEDENT, os blocos são
 delimitados por tokens e a produção `Bloco` é tratada exatamente como
 um par de chaves.
 
-### Conflito encontrado
+### O conflito da lambda
 
-A primeira versão da especificação apresentou 16 conflitos
-shift/reduce, todos concentrados em um único estado. A inspeção do
-arquivo `.info` gerado pelo Happy mostrou origem única: a produção
+A primeira versão, com a lambda entre os operadores, apresentou 16
+conflitos shift/reduce, todos concentrados em um único estado. A
+inspeção do arquivo `.info` gerado pelo Happy mostrou origem única: a
+produção
 
     Expr -> 'lambda' LambdaParams ':' Expr
 
-Ao terminar de reconhecer o corpo da lambda e encontrar um operador,
-o analisador tem duas opções. Deslocar, de modo que o operador
-pertença ao corpo, lendo `lambda x: x + 1` como a função que soma 1.
-Ou reduzir, encerrando a lambda, lendo a mesma entrada como
-`(lambda x: x) + 1`. Os 16 conflitos correspondem aos 16 operadores
-que podem ocorrer nessa posição.
+Ao terminar de reconhecer o corpo da lambda e encontrar um operador, o
+analisador podia deslocar, de modo que o operador pertencesse ao corpo
+(`lambda x: x + 1` como a função que soma 1), ou reduzir, encerrando a
+lambda (`(lambda x: x) + 1`). Os 16 conflitos correspondiam aos 16
+operadores que podem ocorrer nessa posição.
 
-A resolução correta é deslocar, porque a seção 6.11 da especificação
-estabelece que o corpo de uma lambda é uma expressão única.
+Dar baixa precedência a `'lambda'` não surtiu efeito, porque no Happy a
+precedência de uma produção é herdada do seu **último** terminal, que
+nessa regra é o `:`. A primeira solução foi um pseudo-token `LAMBDA`,
+com a menor precedência da tabela, aplicado com `%prec LAMBDA`.
 
-### Resolução
-
-Declarar `'lambda'` com baixa precedência não surtiu efeito, porque
-no Happy a precedência de uma produção é herdada do seu **último**
-terminal, que nessa regra é o `:`. A solução foi introduzir o
-pseudo-token `LAMBDA`, declarado com a menor precedência da tabela, e
-sobrescrever a precedência da produção:
-
-    | 'lambda' LambdaParams ':' Expr %prec LAMBDA
-
-Com isso qualquer operador tem precedência maior que a produção e o
-deslocamento ocorre. A especificação passou a ser gerada com **zero
-conflitos shift/reduce**.
+Os conflitos, porém, eram o sintoma de uma ambiguidade da própria GLC,
+que também punha a lambda entre os átomos (ver "Lambda no nível de
+`Expr`"). Com a lambda no nível de `Expr`, nos três parsers, o corpo
+não pode mais ser seguido de um operador, os conflitos deixam de
+existir por construção e o pseudo-token `LAMBDA` deixou de ser
+necessário. A especificação é gerada com **zero conflitos
+shift/reduce**.
 
 ### Ajustes para concordar com os outros parsers
 
-Duas produções foram reorganizadas para que as verificações aconteçam
-no mesmo ponto do descendente recursivo:
+Três produções foram reorganizadas para que as verificações aconteçam
+no mesmo ponto do descendente recursivo e a AST saia igual:
 
+    Decl        : DefClasse | Comando
     DefFuncao   : 'def' ident ListaParams Retorno ':' Bloco
     ListaParams : '(' Params ')'
 
-`ListaParams` é reduzida logo depois do `)`, antes do corpo, e é na
-sua ação que o parâmetro repetido é recusado, com a posição do `)`. O
-corpo de classe ganhou o `pass` opcional (`Passe`), que o descendente
-recursivo já aceitava.
+Como a função local é um comando, uma definição de nível superior chega
+a `Decl` como `Comando`, e a ação a devolve como `DFun`. `ListaParams`
+é reduzida logo depois do `)`, antes do corpo, e é na sua ação que o
+parâmetro repetido é recusado, com a posição do `)`. O corpo de classe
+ganhou o `pass` opcional (`Passe`), que o descendente recursivo já
+aceitava.
 
 Para o erro sintático o Happy foi configurado com `%errorhandlertype
 explist`, que entrega ao tratador os terminais aceitos no estado do
@@ -478,6 +510,10 @@ O parâmetro repetido é apontado no `)` que fecha a lista, como no
 arquivo `.err` correspondente, e essa posição não fica na AST; por
 isso a verificação é feita por cada parser, e não em `Validate`.
 
+No corpo de uma função local, `return` vale, mas o laço de fora não
+conta: um `break` numa função definida dentro de um `while` é erro,
+como em Python, porque não há laço para interromper na própria função.
+
 ## Mensagens de erro
 
 Todas as mensagens seguem a seção 2.1 do enunciado,
@@ -488,6 +524,12 @@ usam o texto dos `.err` (`caractere inválido`, `string não terminada`,
 sintáticos têm a forma `expected X, got Y`, em que Y é o token
 encontrado: `NEWLINE`, `INDENT`, `DEDENT` e `EOF` pelo nome, os demais
 pelo texto entre aspas simples.
+
+Um literal numérico é mal formado quando o separador `_` não está entre
+dois dígitos (`1__2`, `1_`), quando falta dígito depois do ponto (`3.`)
+ou quando o expoente não tem dígitos (`1e`, `1e+`). A mensagem diz
+`literal inteiro mal formado` ou `literal float mal formado`, com o
+texto lido, e aponta o início do número.
 
 O erro de indentação é apontado no NEWLINE da linha anterior, e não no
 primeiro token da linha mal indentada, porque é ao fim daquela linha

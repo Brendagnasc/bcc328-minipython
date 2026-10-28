@@ -43,7 +43,7 @@ pNot :: Parser Expr
 pNot = do
   m <- accept TkNot
   case m of
-    Just t  -> EUn (tokPos t) Not <$> pNot
+    Just t  -> EUnOp (tokPos t) Not <$> pNot
     Nothing -> pRel
 
 -- | ExprRel ::= ExprAdit [ OpRel ExprAdit ]
@@ -59,7 +59,7 @@ pRel = do
     Just (_, op) -> do
       _ <- advance
       right <- pAdd
-      pure (EBin (exprPos left) op left right)
+      pure (EBinOp (exprPos left) op left right)
 
 -- | ExprAdit ::= ExprMult { ( '+' | '-' ) ExprMult }
 pAdd :: Parser Expr
@@ -77,7 +77,7 @@ pUnary :: Parser Expr
 pUnary = do
   m <- accept TkMinus
   case m of
-    Just t  -> EUn (tokPos t) Neg <$> pUnary
+    Just t  -> EUnOp (tokPos t) Neg <$> pUnary
     Nothing -> pPow
 
 -- | ExprPot ::= ExprPosfixa [ '**' ExprPot ]
@@ -89,7 +89,7 @@ pPow = do
   m <- accept TkDStar
   case m of
     Nothing -> pure base
-    Just _  -> EBin (exprPos base) Pow base <$> pPow
+    Just _  -> EBinOp (exprPos base) Pow base <$> pPow
 
 -- | ExprPosfixa ::= Atomo { Posfixo }
 --
@@ -186,7 +186,7 @@ chainLeft next ops = next >>= go
         Just (_, op) -> do
           _ <- advance
           right <- next
-          go (EBin (exprPos acc) op acc right)
+          go (EBinOp (exprPos acc) op acc right)
 
 -- | Se o proximo token for um dos operadores da tabela, devolve-o
 -- junto com o operador correspondente, sem consumir.

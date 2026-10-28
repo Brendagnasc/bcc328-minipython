@@ -294,7 +294,7 @@ pAnd :: PegParser Expr
 pAnd = chainl1 pNot [(L.TkAnd, And)]
 
 pNot :: PegParser Expr
-pNot = (do t <- tok L.TkNot; EUn (L.tokPos t) Not <$> pNot) <|> pRel
+pNot = (do t <- tok L.TkNot; EUnOp (L.tokPos t) Not <$> pNot) <|> pRel
 
 pRel :: PegParser Expr
 pRel = do
@@ -302,7 +302,7 @@ pRel = do
   mop <- optional (choice [ op <$ tok lx | (lx, op) <- relOps ])
   case mop of
     Nothing -> pure left
-    Just op -> EBin (exprPos left) op left <$> pAdd
+    Just op -> EBinOp (exprPos left) op left <$> pAdd
 
 pAdd :: PegParser Expr
 pAdd = chainl1 pMul [(L.TkPlus, Add), (L.TkMinus, Sub)]
@@ -311,7 +311,7 @@ pMul :: PegParser Expr
 pMul = chainl1 pUnary mulOps
 
 pUnary :: PegParser Expr
-pUnary = (do t <- tok L.TkMinus; EUn (L.tokPos t) Neg <$> pUnary) <|> pPow
+pUnary = (do t <- tok L.TkMinus; EUnOp (L.tokPos t) Neg <$> pUnary) <|> pPow
 
 pPow :: PegParser Expr
 pPow = do
@@ -319,7 +319,7 @@ pPow = do
   mp <- optional (tok_ L.TkDStar *> pPow)
   pure $ case mp of
     Nothing -> base
-    Just e  -> EBin (exprPos base) Pow base e
+    Just e  -> EBinOp (exprPos base) Pow base e
 
 pPostfix :: PegParser Expr
 pPostfix = pAtom >>= go
@@ -375,7 +375,7 @@ chainl1 next ops = next >>= go
     go acc = (do
       op <- choice [ o <$ tok lx | (lx, o) <- ops ]
       right <- next
-      go (EBin (exprPos acc) op acc right)) <|> pure acc
+      go (EBinOp (exprPos acc) op acc right)) <|> pure acc
 
 relOps :: [(L.Lexeme, BinOp)]
 relOps =

@@ -118,8 +118,8 @@ data Expr
   | ENone Pos
   | EVar Pos Name
   | ESelf Pos
-  | EBin Pos BinOp Expr Expr
-  | EUn Pos UnOp Expr
+  | EBinOp Pos BinOp Expr Expr
+  | EUnOp Pos UnOp Expr
   -- | Chamada @f(e1, ..., en)@. O alvo e uma expressao para cobrir
   -- tambem @obj.metodo(...)@ e @Pai.__init__(...)@.
   | ECall Pos Expr [Expr]
@@ -166,8 +166,8 @@ exprPos e = case e of
   ENone p       -> p
   EVar p _      -> p
   ESelf p       -> p
-  EBin p _ _ _  -> p
-  EUn p _ _     -> p
+  EBinOp p _ _ _  -> p
+  EUnOp p _ _     -> p
   ECall p _ _   -> p
   EIndex p _ _  -> p
   EField p _ _  -> p

@@ -20,7 +20,6 @@ library
                     , MiniPython.Frontend.Lexer.Indent
                     , MiniPython.Frontend.Syntax.MiniPythonSyntax
                     , MiniPython.Frontend.Pretty.MiniPythonPretty
-                    , MiniPython.Utils.Pretty
                     , MiniPython.Frontend.Parser.Core
                     , MiniPython.Frontend.Parser.Expr
                     , MiniPython.Frontend.Parser.RecursiveDescent
@@ -28,7 +27,7 @@ library
                     , MiniPython.Frontend.Parser.PEG
                     , MiniPython.Frontend.Parser.Happy.Grammar
     build-depends:    base ^>=4.18.2.1
-                    , pretty >=1.1 && <2
+                    , containers >=0.6 && <0.8
                     , megaparsec >=9.5 && <10
                     , parser-combinators >=1.3 && <2
                     , array >=0.5 && <0.6
@@ -41,6 +40,7 @@ executable mpyc
     main-is:          Main.hs
     build-depends:    base ^>=4.18.2.1
                     , minipython
+                    , containers >=0.6 && <0.8
                     , megaparsec >=9.5 && <10
                     , filepath >=1.4 && <1.6
     hs-source-dirs:   app

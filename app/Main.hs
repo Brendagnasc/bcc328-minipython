@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Data.Tree (drawTree)
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 import MiniPython.CLI (Mode (..), Options (..), parseArgs, usage)
 import MiniPython.Frontend.Lexer.Indent (layout)
@@ -9,7 +10,7 @@ import MiniPython.Frontend.Parser.Core (formatParseError)
 import MiniPython.Frontend.Parser.Happy.Grammar (parseProgramLALR)
 import MiniPython.Frontend.Parser.PEG (formatPegError, parseProgramPEG)
 import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
-import MiniPython.Frontend.Pretty.MiniPythonPretty (pretty)
+import MiniPython.Frontend.Pretty.MiniPythonPretty (toTree)
 import MiniPython.Utils.Error (formatError)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -41,13 +42,13 @@ run mode file src = do
     Lex -> mapM_ (putStrLn . renderToken) toks
     ParseRD -> case parseProgram toks of
       Left err  -> abort (formatParseError file err)
-      Right ast -> putStrLn (pretty ast)
+      Right ast -> putStrLn (drawTree (toTree ast))
     ParsePEG -> case parseProgramPEG file toks of
       Left bundle -> abort (formatPegError file bundle)
-      Right ast   -> putStrLn (pretty ast)
+      Right ast   -> putStrLn (drawTree (toTree ast))
     ParseLALR -> case parseProgramLALR toks of
       Left msg  -> abort (file ++ ":" ++ msg)
-      Right ast -> putStrLn (pretty ast)
+      Right ast -> putStrLn (drawTree (toTree ast))
 
 -- | Executa o analisador lexico com a camada de indentacao, abortando
 -- com mensagem posicionada em caso de erro. Como nos arquivos .err, a

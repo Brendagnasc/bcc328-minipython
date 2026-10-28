@@ -228,23 +228,23 @@ TipoList :: { [Type] }
 
 Expr :: { Expr }
   : Expr 'if' Expr 'else' Expr      { ECond (exprPos $1) $1 $3 $5 }
-  | Expr 'or' Expr                  { EBin (exprPos $1) Or $1 $3 }
-  | Expr 'and' Expr                 { EBin (exprPos $1) And $1 $3 }
-  | 'not' Expr                      { EUn (tokPos $1) Not $2 }
-  | Expr '==' Expr                  { EBin (exprPos $1) Eq $1 $3 }
-  | Expr '!=' Expr                  { EBin (exprPos $1) Neq $1 $3 }
-  | Expr '<' Expr                   { EBin (exprPos $1) Lt $1 $3 }
-  | Expr '<=' Expr                  { EBin (exprPos $1) Le $1 $3 }
-  | Expr '>' Expr                   { EBin (exprPos $1) Gt $1 $3 }
-  | Expr '>=' Expr                  { EBin (exprPos $1) Ge $1 $3 }
-  | Expr '+' Expr                   { EBin (exprPos $1) Add $1 $3 }
-  | Expr '-' Expr                   { EBin (exprPos $1) Sub $1 $3 }
-  | Expr '*' Expr                   { EBin (exprPos $1) Mul $1 $3 }
-  | Expr '/' Expr                   { EBin (exprPos $1) Div $1 $3 }
-  | Expr '//' Expr                  { EBin (exprPos $1) FloorDiv $1 $3 }
-  | Expr '%' Expr                   { EBin (exprPos $1) Mod $1 $3 }
-  | '-' Expr %prec NEG              { EUn (tokPos $1) Neg $2 }
-  | Expr '**' Expr                  { EBin (exprPos $1) Pow $1 $3 }
+  | Expr 'or' Expr                  { EBinOp (exprPos $1) Or $1 $3 }
+  | Expr 'and' Expr                 { EBinOp (exprPos $1) And $1 $3 }
+  | 'not' Expr                      { EUnOp (tokPos $1) Not $2 }
+  | Expr '==' Expr                  { EBinOp (exprPos $1) Eq $1 $3 }
+  | Expr '!=' Expr                  { EBinOp (exprPos $1) Neq $1 $3 }
+  | Expr '<' Expr                   { EBinOp (exprPos $1) Lt $1 $3 }
+  | Expr '<=' Expr                  { EBinOp (exprPos $1) Le $1 $3 }
+  | Expr '>' Expr                   { EBinOp (exprPos $1) Gt $1 $3 }
+  | Expr '>=' Expr                  { EBinOp (exprPos $1) Ge $1 $3 }
+  | Expr '+' Expr                   { EBinOp (exprPos $1) Add $1 $3 }
+  | Expr '-' Expr                   { EBinOp (exprPos $1) Sub $1 $3 }
+  | Expr '*' Expr                   { EBinOp (exprPos $1) Mul $1 $3 }
+  | Expr '/' Expr                   { EBinOp (exprPos $1) Div $1 $3 }
+  | Expr '//' Expr                  { EBinOp (exprPos $1) FloorDiv $1 $3 }
+  | Expr '%' Expr                   { EBinOp (exprPos $1) Mod $1 $3 }
+  | '-' Expr %prec NEG              { EUnOp (tokPos $1) Neg $2 }
+  | Expr '**' Expr                  { EBinOp (exprPos $1) Pow $1 $3 }
   | 'lambda' LambdaParams ':' Expr %prec LAMBDA
                                     { ELambda (tokPos $1) (reverse $2) $4 }
   | Posfixa                         { $1 }

@@ -2,7 +2,7 @@
 % Seção: Uso de IA generativa
 % Brenda Gabrielle Alves Nascimento, 24.1.4011
 % BCC328 - Construção de Compiladores I - Trabalho Prático 1
-% Inserir antes da conclusão.
+% Incluído como apêndice, depois das referências.
 % Requer apenas comandos básicos (\texttt, \emph, itemize).
 % ============================================================
 
@@ -77,7 +77,7 @@ níveis e depois as exceções da Seção 4.5 da especificação.
 
 \textbf{Modificações.} As palavras \texttt{True} e \texttt{False} foram
 removidas das reservadas e passaram a ser reconhecidas como
-\texttt{TBoolLit}, evitando duas representações para o mesmo valor.
+\texttt{TkBoolLit}, evitando duas representações para o mesmo valor.
 Posteriormente foi necessário derivar \texttt{Ord} em \texttt{Lexeme} e
 \texttt{Token}, exigência da instância \texttt{Stream} do Megaparsec.
 
@@ -184,7 +184,7 @@ uma produção é herdada do seu último terminal, que naquela regra é o
 \texttt{LAMBDA} com a menor precedência da tabela e sobrescrever a
 precedência da produção com \texttt{\%prec LAMBDA}, levando a zero
 conflitos. O conflito e sua resolução estão detalhados na
-Seção~\ref{sec:gramatica}.
+Seção~\ref{sec:dificuldades}.
 
 \subsection{Testes}
 

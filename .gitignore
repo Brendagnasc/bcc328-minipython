@@ -15,4 +15,6 @@ src/MiniPython/Frontend/Parser/Happy/*.hs
 *.out
 *.toc
 *.synctex.gz
+*.fls
+*.fdb_latexmk
 report/.auctex-auto/

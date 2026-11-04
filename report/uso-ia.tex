@@ -1,215 +1,379 @@
+```latex
 % ============================================================
 % Seção: Uso de IA generativa
 % Brenda Gabrielle Alves Nascimento, 24.1.4011
 % BCC328 - Construção de Compiladores I - Trabalho Prático 1
-% Incluído como apêndice, depois das referências.
-% Requer apenas comandos básicos (\texttt, \emph, itemize).
+% Inserir antes da conclusão.
 % ============================================================
 
 \section{Uso de IA generativa}
 \label{sec:ia}
 
-Esta seção atende ao item 4 da Seção 8 do enunciado. O trabalho foi
-desenvolvido em diálogo com o assistente Claude (Anthropic), que gerou
-código dos módulos a partir de especificações discutidas caso a caso. O uso
-não foi de geração única: o ciclo repetido foi definir a decisão de projeto,
-gerar o módulo, compilar com \texttt{-Wall -Werror}, corrigir os erros
-apontados pelo compilador, testar contra os programas da Seção 9 da
-especificação e só então registrar o \emph{commit}. A compilação com
-\texttt{-Werror} desde o primeiro \emph{commit} foi decisão deliberada,
-justamente para que nenhum código entrasse no repositório sem verificação.
+O desenvolvimento do trabalho contou com o apoio de uma ferramenta
+de inteligência artificial generativa, o assistente Claude
+(Anthropic), utilizada ao longo das diferentes etapas de implementação.
+A ferramenta foi empregada como recurso de apoio à compreensão dos
+requisitos, discussão de decisões de projeto, consulta sobre conceitos
+e bibliotecas da linguagem Haskell, elaboração de trechos de código
+e investigação de problemas identificados durante a compilação e os
+testes.
 
-O histórico de \emph{commits} do repositório reflete esse ciclo, com um
-arquivo por \emph{commit} e correções registradas separadamente das adições.
+A interação ocorreu de forma incremental. As solicitações eram
+formuladas a partir dos requisitos do trabalho, das decisões de
+implementação e dos problemas encontrados durante o desenvolvimento.
+As respostas obtidas eram analisadas e comparadas com a especificação,
+a documentação das bibliotecas e o material disponibilizado na
+disciplina. Quando necessário, as sugestões eram corrigidas, adaptadas
+ou descartadas antes de serem incorporadas ao projeto.
 
-\subsection{Planejamento e ambiente}
+A ferramenta também auxiliou na elaboração de módulos e trechos de
+código. Entretanto, sua utilização não substituiu a análise dos
+requisitos nem a avaliação das soluções adotadas. As decisões de
+projeto, a escolha entre alternativas, a integração dos componentes
+e a validação do comportamento do compilador permaneceram sob
+responsabilidade da autora.
 
-\textbf{Prompt.} Solicitação de um plano de etapas a partir do enunciado e
-da especificação, com desenvolvimento incremental versionado em Git.
+Como parte do processo de verificação, foi adotado o ciclo de
+desenvolvimento incremental: definir o problema ou a decisão de
+projeto, consultar a ferramenta quando pertinente, analisar a solução
+proposta, implementar ou adaptar o código, compilar com
+\texttt{-Wall -Werror}, executar os testes e registrar as alterações
+aprovadas no Git. Dessa forma, os resultados sugeridos pela IA eram
+tratados como propostas a serem verificadas, e não como soluções
+automaticamente corretas.
 
-\textbf{Resposta.} Plano de dez etapas, da configuração do ambiente ao
-relatório, com a ordem justificada pela dependência entre as fases do
-compilador.
+\subsection{Planejamento e organização do desenvolvimento}
 
-\textbf{Modificações.} O plano foi seguido na ordem proposta. A etapa de
-ambiente exigiu refazer a instalação: a distribuição fornecia GHC 8.8.4,
-incompatível com o \texttt{base \^{}>=4.18.2.1} exigido pelo esqueleto da
-disciplina. Substituído por GHC 9.6.7 via GHCup, versão que coincide com a
-do ambiente oficial da disciplina.
+\textbf{Contexto da interação.} No início do trabalho, foi necessário
+organizar as etapas de implementação a partir do enunciado e da
+especificação, considerando as dependências entre os componentes
+do compilador.
 
-\subsection{Alinhamento com o material da disciplina}
+\textbf{Apoio da IA.} Foi solicitado ao assistente um plano de
+desenvolvimento incremental, contemplando desde a configuração do
+ambiente até a elaboração do relatório e a validação final.
 
-\textbf{Prompt.} Análise do repositório \texttt{bcc328-2026-2} para alinhar
-a estrutura do projeto às convenções adotadas nos exemplos do professor.
+\textbf{Análise e decisões.} A ferramenta propôs um plano dividido
+em dez etapas, com uma sequência baseada nas dependências entre
+as fases do compilador. O plano foi utilizado como referência para
+organizar o trabalho, mantendo-se a possibilidade de ajustar a ordem
+e o escopo das atividades conforme os problemas encontrados.
 
-\textbf{Resposta.} Identificação da convenção de diretórios
-\texttt{Frontend/Lexer}, \texttt{Frontend/Parser}, \texttt{Frontend/Syntax}
-e \texttt{Frontend/Pretty}, e da organização do exemplo \texttt{Exp}, que
-mantém três implementações de analisador léxico compartilhando um único
-\texttt{Token.hs}.
+\textbf{Validação.} Durante a configuração do ambiente, foi
+identificada uma incompatibilidade entre a versão do GHC 8.8.4
+disponibilizada inicialmente pela distribuição e a restrição
+\texttt{base \^{}>=4.18.2.1} exigida pelo esqueleto da disciplina.
+A instalação foi refeita utilizando GHCup, com o GHC 9.6.7,
+versão compatível com o ambiente oficial da disciplina.
 
-\textbf{Modificações.} A estrutura do projeto foi reorganizada para seguir
-essa convenção. A classe \texttt{Pretty} sobre
-\texttt{Text.PrettyPrint.HughesPJ} foi adotada a partir de
+\subsection{Consulta e alinhamento com o material da disciplina}
+
+\textbf{Contexto da interação.} Para manter a organização do projeto
+compatível com os exemplos utilizados na disciplina, foi realizada
+uma consulta ao repositório \texttt{bcc328-2026-2}, disponibilizado
+pelo professor.
+
+\textbf{Apoio da IA.} O assistente auxiliou na análise da estrutura
+do repositório e na identificação de convenções presentes nos
+exemplos, especialmente a organização dos diretórios
+\texttt{Frontend/Lexer}, \texttt{Frontend/Parser},
+\texttt{Frontend/Syntax} e \texttt{Frontend/Pretty}. Também foi
+observada a organização do exemplo \texttt{Exp}, que mantém
+implementações distintas de analisador léxico compartilhando
+um único arquivo \texttt{Token.hs}.
+
+\textbf{Análise e decisões.} A estrutura do projeto foi reorganizada
+para seguir essas convenções. A classe \texttt{Pretty}, baseada em
+\texttt{Text.PrettyPrint.HughesPJ}, foi adotada a partir do arquivo
 \texttt{Utils/Pretty.hs} do repositório da disciplina.
 
-Duas afirmações do assistente precisaram ser corrigidas pela consulta ao
-material. O \texttt{flake.nix} gerado usava o atributo
-\texttt{pkgs.haskell.compiler.ghc966}, inexistente em \emph{nixpkgs}; o
-arquivo do professor mostrou que o atributo correto é \texttt{ghc96}. E o
-assistente afirmou que o gerador Alex não mantém estado entre linhas, o que
-inviabilizaria a camada de indentação; a leitura do \texttt{LineLexer.x} do
-professor mostrou que o \texttt{\%wrapper "monadUserState"} permite manter
-estado. A decisão por um \emph{scanner} \emph{ad-hoc} foi mantida, mas pelo
-motivo correto: uma ação do Alex devolve um único \emph{token}, e a emissão
-de múltiplos \texttt{DEDENT} consecutivos exigiria uma fila de \emph{tokens}
-pendentes no estado do analisador.
+Durante essa etapa, duas informações fornecidas pelo assistente
+precisaram ser revistas. A primeira envolvia o atributo
+\texttt{pkgs.haskell.compiler.ghc966}, utilizado no
+\texttt{flake.nix} sugerido, que não estava disponível em
+\emph{nixpkgs}; a consulta ao arquivo do professor indicou
+\texttt{ghc96} como atributo adequado. A segunda dizia respeito
+à possibilidade de o Alex manter estado entre linhas. A leitura
+do arquivo \texttt{LineLexer.x} mostrou que o wrapper
+\texttt{monadUserState} permite manter estado durante a análise.
 
-\subsection{Analisador léxico e camada de indentação}
+A decisão de utilizar um \emph{scanner} \emph{ad-hoc} foi mantida,
+mas por outro motivo: uma ação do Alex devolve um único
+\emph{token}, enquanto a emissão de múltiplos \texttt{DEDENT}
+consecutivos exigiria uma fila de \emph{tokens} pendentes no estado
+do analisador.
 
-\textbf{Prompt.} Geração dos tipos \texttt{Pos}, \texttt{Lexeme} e
-\texttt{Token}; em seguida do \emph{scanner}; e por fim da camada de
-indentação, esta pedida explicitamente em duas partes, primeiro a pilha de
-níveis e depois as exceções da Seção 4.5 da especificação.
+\textbf{Validação.} As convenções adotadas foram comparadas com
+os arquivos do repositório da disciplina, e as informações
+divergentes foram corrigidas antes de serem utilizadas no projeto.
 
-\textbf{Resposta.} Os módulos \texttt{Token.hs},
-\texttt{MiniPythonLexer.hs} e \texttt{Indent.hs}.
+\subsection{Apoio na implementação do analisador léxico e da camada de indentação}
 
-\textbf{Modificações.} As palavras \texttt{True} e \texttt{False} foram
-removidas das reservadas e passaram a ser reconhecidas como
-\texttt{TkBoolLit}, evitando duas representações para o mesmo valor.
-Posteriormente foi necessário derivar \texttt{Ord} em \texttt{Lexeme} e
-\texttt{Token}, exigência da instância \texttt{Stream} do Megaparsec.
+\textbf{Contexto da interação.} A implementação do analisador léxico
+exigia definir as estruturas de posição, lexemas e tokens, além
+de tratar as regras específicas de indentação da linguagem.
 
-A divisão da camada de indentação em duas partes foi pedida de propósito. A
-primeira versão foi testada contra um programa com linha em branco no meio
-de um bloco e produziu \texttt{DEDENT} seguido de \texttt{INDENT} indevidos,
-o que confirmou empiricamente a necessidade do item 4 da Seção 4.5 antes de
-implementá-lo.
+\textbf{Apoio da IA.} O assistente auxiliou na elaboração dos tipos
+\texttt{Pos}, \texttt{Lexeme} e \texttt{Token}, do módulo
+\texttt{MiniPythonLexer.hs} e da camada de indentação
+\texttt{Indent.hs}. A implementação da indentação foi discutida
+em etapas, inicialmente com a pilha de níveis e, depois, com
+as exceções descritas na Seção 4.5 da especificação.
 
-\subsection{AST e impressão}
+\textbf{Análise e decisões.} As palavras \texttt{True} e
+\texttt{False} foram retiradas da lista de palavras reservadas
+e passaram a ser reconhecidas como \texttt{TBoolLit}, evitando
+duas representações para o mesmo valor. Posteriormente, foi
+necessário derivar \texttt{Ord} em \texttt{Lexeme} e
+\texttt{Token}, requisito da instância \texttt{Stream} do
+Megaparsec.
 
-\textbf{Prompt.} Geração da AST com posição em cada nó, conforme a Seção 3
-do enunciado, e de um impressor que não utilize instâncias de \texttt{Show}
-geradas pelo compilador.
+A implementação da camada de indentação em etapas permitiu
+identificar um problema na primeira versão: um programa com
+linha em branco no meio de um bloco produzia sequências
+indevidas de \texttt{DEDENT} e \texttt{INDENT}. Esse resultado
+indicou a necessidade de considerar o tratamento previsto no
+item 4 da Seção 4.5 antes de finalizar a implementação.
 
-\textbf{Resposta.} Os módulos \texttt{MiniPythonSyntax.hs} e
-\texttt{MiniPythonPretty.hs}, este último com a impressão de expressões
-estratificada por precedência.
+\textbf{Validação.} Os módulos foram compilados e testados com
+programas que exercitavam as regras de indentação, incluindo
+casos com linhas em branco e encerramento de blocos. Os
+comportamentos divergentes foram utilizados para orientar
+as correções.
 
-\textbf{Modificações.} O código gerado não compilava por instâncias órfãs,
-já que \texttt{-Wall} inclui \texttt{-Worphans} e as instâncias de
-\texttt{Pretty} ficam em módulo distinto tanto da classe quanto dos tipos.
-Resolvido com \texttt{\{-\# OPTIONS\_GHC -Wno-orphans \#-\}} e comentário
-justificando a separação, mesma técnica empregada pelo professor no
-\texttt{LineLexer.x}. Houve ainda um erro de acesso a registro
-(\texttt{case clsSuper of} em vez de \texttt{case clsSuper cd of}) e o uso
-de \texttt{punctuate (text "")} com \texttt{vcat}, que não produz a linha em
-branco pretendida, corrigido com \texttt{\$+\$}.
+\subsection{Modelagem da AST e representação textual}
 
-\subsection{Gramática e analisador descendente recursivo}
+\textbf{Contexto da interação.} A construção da árvore sintática
+abstrata (AST) deveria seguir a Seção 3 do enunciado, armazenando
+a posição de cada nó. Também era necessário implementar uma
+representação textual própria, sem depender de instâncias
+\texttt{Show} geradas automaticamente.
 
-\textbf{Prompt.} Proposta de GLC não ambígua e, em seguida, geração do
-analisador em três módulos separados: mecanismo, expressões, comandos e
-declarações.
+\textbf{Apoio da IA.} O assistente auxiliou na elaboração dos
+módulos \texttt{MiniPythonSyntax.hs} e
+\texttt{MiniPythonPretty.hs}, incluindo a organização dos tipos
+da AST e a impressão de expressões considerando os níveis
+de precedência.
 
-\textbf{Resposta.} A gramática de \texttt{docs/gramatica.md} e os módulos
-\texttt{Core.hs}, \texttt{Expr.hs} e \texttt{RecursiveDescent.hs}.
+\textbf{Análise e decisões.} A primeira versão apresentou
+problemas de compilação relacionados a instâncias órfãs.
+Como \texttt{-Wall} inclui o aviso \texttt{-Worphans}, foi
+necessário tratar explicitamente essa condição. A solução
+adotada utilizou \texttt{\{-\# OPTIONS\_GHC -Wno-orphans \#-\}}
+acompanhada de comentário justificando a separação entre
+a classe, os tipos e as instâncias de \texttt{Pretty}. Essa
+abordagem também aparece no arquivo \texttt{LineLexer.x}
+do professor.
 
-\textbf{Modificações.} A primeira versão da gramática foi rejeitada e
-refeita: a produção \texttt{Alvo} permitia chamadas de função como alvo de
-atribuição, com a restrição expressa apenas em texto corrido, e foi
-reescrita para restringir na própria gramática.
+Outros ajustes envolveram o acesso a um registro, em que
+\texttt{case clsSuper of} foi corrigido para
+\texttt{case clsSuper cd of}, e a composição da saída textual:
+o uso de \texttt{punctuate (text "")} com \texttt{vcat}
+não produzia a linha em branco esperada, sendo substituído
+por \texttt{\$+\$}.
 
-No analisador, os quatro programas de teste falharam na primeira execução
-com erro em \texttt{int(input())}. A causa é que \texttt{int},
-\texttt{float}, \texttt{str} e \texttt{bool} são palavras reservadas de tipo
-e também funções primitivas de conversão (Seção 8 da especificação), e o
-não-terminal \texttt{Atomo} não as tratava em posição de expressão.
+\textbf{Validação.} A AST e o impressor foram verificados por
+meio da compilação e da comparação da representação gerada
+com a estrutura esperada para os programas de teste.
 
-Foi alterada também a convenção de posição dos nós: o código gerado usava a
-posição do operador em \texttt{EBin}, de modo que o erro de alvo inválido em
-\texttt{1 + 2 = 3} apontava o \texttt{+}. Passou a valer a regra de que a
-posição de um nó é sempre o início da construção no texto fonte, decisão que
-também beneficia as mensagens do verificador de tipos no trabalho seguinte.
+\subsection{Discussão da gramática e implementação do analisador descendente recursivo}
 
-\subsection{Analisador PEG}
+\textbf{Contexto da interação.} Foi necessário definir uma
+gramática livre de contexto (GLC) não ambígua e implementar
+um analisador descendente recursivo organizado em módulos.
 
-\textbf{Prompt.} Implementação com Megaparsec operando sobre a lista de
-\emph{tokens} já produzida pelo analisador léxico.
+\textbf{Apoio da IA.} O assistente auxiliou na discussão das
+produções da gramática e na elaboração de uma primeira versão
+de \texttt{docs/gramatica.md}, além de apoiar a organização
+do analisador nos módulos \texttt{Core.hs}, \texttt{Expr.hs}
+e \texttt{RecursiveDescent.hs}.
 
-\textbf{Resposta.} O módulo \texttt{Stream.hs}, com a instância de
-\texttt{Stream} para \texttt{[Token]}, e o módulo \texttt{PEG.hs} com a
-gramática.
+\textbf{Análise e decisões.} A primeira versão da gramática
+precisou ser revista porque a produção \texttt{Alvo} permitia
+chamadas de função como alvo de atribuição, deixando essa
+restrição apenas em uma explicação textual. A produção foi
+reescrita para expressar a restrição diretamente na gramática.
 
-\textbf{Modificações.} Este foi o módulo com maior número de correções:
-importação não utilizada de \texttt{Data.Set}; definição
-\texttt{type Void = ()} colidindo com o \texttt{Void} de \texttt{Data.Void}
-exigido pelo Megaparsec; colisão de nomes, pois o Megaparsec define
-\texttt{Token} e \texttt{Pos} com os mesmos nomes do analisador léxico,
-resolvida importando o módulo do \emph{lexer} qualificado; remoção e
-posterior restauração de \texttt{deriving Ord}, exigido como superclasse de
-\texttt{Stream}; assinatura incorreta em \texttt{attachSourcePos},
-reescrita com \texttt{reachOffset}; e três ocorrências de
-\texttt{anySingle} descartando resultado sem marcação explícita. A saída de
-erro usava \texttt{errorBundlePretty}, que imprimia caracteres espúrios por
-tentar exibir a linha do fonte num fluxo de \emph{tokens}, e foi substituída
-por formatação própria, uniforme com a dos demais analisadores.
+Na implementação do analisador, os quatro programas de teste
+falharam inicialmente em expressões como \texttt{int(input())}.
+A investigação mostrou que \texttt{int}, \texttt{float},
+\texttt{str} e \texttt{bool} são palavras reservadas de tipo,
+mas também funcionam como conversões primitivas na Seção 8
+da especificação. O não-terminal \texttt{Atomo} não tratava
+esses identificadores em posição de expressão, sendo necessário
+ajustar a análise sintática.
 
-Uma decisão foi tomada contra a sugestão inicial. Avaliou-se o uso da
-biblioteca PEG da disciplina (\texttt{workspace/src/PEG/}); a leitura do
-código mostrou uso intensivo de \texttt{DataKinds}, \texttt{TypeFamilies} e
-programação em nível de tipos, e optou-se pelo Megaparsec, alternativa
-explicitamente permitida pelo enunciado.
+Também foi revista a convenção de posição dos nós. A primeira
+versão utilizava a posição do operador em \texttt{EBin}; por
+isso, um erro em \texttt{1 + 2 = 3} apontava para o símbolo
+\texttt{+}. Foi adotada a convenção de que a posição de um nó
+corresponde ao início da construção no texto-fonte, o que
+também favorece a localização de erros em etapas posteriores,
+como a verificação de tipos.
 
-\subsection{Analisador LALR}
+\textbf{Validação.} A gramática e o analisador foram avaliados
+com os programas de teste da especificação, incluindo casos
+válidos e inválidos. As falhas observadas orientaram as
+alterações nas produções e nas regras de análise.
 
-\textbf{Prompt.} Especificação para o Happy com precedência declarada por
-diretivas e sem estratificar as produções de expressão, conforme a Seção 5
-do enunciado.
+\subsection{Comparação de alternativas e implementação do analisador PEG}
 
-\textbf{Resposta.} O arquivo \texttt{Grammar.y}.
+\textbf{Contexto da interação.} A implementação do analisador PEG
+exigia a utilização da biblioteca \texttt{typed-peg}. Diferentemente
+do analisador descendente recursivo, que utiliza uma lista de tokens
+produzida pelo analisador léxico, o analisador PEG realiza a análise
+diretamente sobre o texto-fonte.
 
-\textbf{Modificações.} Faltavam \texttt{array} nas dependências, exigido
-pelo código gerado, e \texttt{build-tool-depends: happy:happy} no
-\texttt{.cabal}.
+\textbf{Apoio da IA.} O assistente auxiliou na compreensão da
+estrutura da biblioteca, na elaboração das regras da gramática PEG
+e na implementação do módulo \texttt{PEG.hs}, utilizando o
+quasi-quoter \texttt{pegGrammar}. Também contribuiu na investigação
+de problemas relacionados ao reconhecimento das construções da
+linguagem e à localização dos erros no código-fonte.
 
-A primeira versão apresentou 16 conflitos \emph{shift/reduce}. O
-diagnóstico partiu do arquivo gerado por \texttt{happy -{}-info}, que os
-localizou todos num único estado, originados da produção do corpo da
-\emph{lambda}. A primeira tentativa de resolução sugerida, declarar
-\texttt{\%right 'lambda'}, não teve efeito, porque no Happy a precedência de
-uma produção é herdada do seu último terminal, que naquela regra é o
-\texttt{:}. A resolução efetiva foi introduzir o pseudo-\emph{token}
-\texttt{LAMBDA} com a menor precedência da tabela e sobrescrever a
-precedência da produção com \texttt{\%prec LAMBDA}, levando a zero
-conflitos. O conflito e sua resolução estão detalhados na
-Seção~\ref{sec:dificuldades}.
+\textbf{Análise e decisões.} Durante o desenvolvimento, foi
+avaliado o uso da implementação PEG disponibilizada na disciplina
+(\texttt{workspace/src/PEG/}). Após a análise de sua estrutura
+e dos recursos utilizados, optou-se pela biblioteca
+\texttt{typed-peg}, alternativa permitida pelo enunciado.
 
-\subsection{Testes}
+A implementação exigiu ajustes na gramática para contemplar
+o reconhecimento das construções da linguagem diretamente no
+texto-fonte, incluindo o tratamento da indentação. Também foi
+necessário considerar as informações de posição disponibilizadas
+pela biblioteca para produzir mensagens de erro adequadas.
 
-\textbf{Prompt.} Programas de teste a partir dos exemplos da Seção 9 da
-especificação e \emph{script} de verificação da equivalência entre os três
-analisadores.
+A utilização do \texttt{typed-peg} foi mantida na versão final
+do projeto. É importante destacar que o Megaparsec foi utilizado
+no analisador descendente recursivo, e não no PEG. Essa separação
+permitiu manter as duas implementações sintáticas independentes,
+conforme a organização proposta para o trabalho.
 
-\textbf{Resposta.} Nove programas válidos, sete inválidos e os
-\emph{scripts} \texttt{testes/rodar.sh} e \texttt{testes/gerar-saidas.sh}.
+\textbf{Validação.} O analisador PEG foi compilado e executado
+com os programas de teste da especificação. Seus resultados
+foram comparados com os produzidos pelos outros analisadores,
+verificando o reconhecimento das construções da linguagem e
+a consistência dos resultados.
 
-\textbf{Modificações.} A primeira execução do comparativo entre analisadores
-produziu falsos positivos: a compilação estava quebrada e ambos os lados da
-comparação retornavam saída vazia, que o \texttt{diff} reportava como
-idêntica. O \emph{script} foi reescrito para gravar as saídas em arquivo e
-verificar que não são vazias antes de compará-las.
+\subsection{Implementação e depuração do analisador LALR}
+
+\textbf{Contexto da interação.} A implementação do analisador
+LALR com Happy deveria declarar a precedência por meio de
+diretivas, sem estratificar as produções de expressão,
+conforme a Seção 5 do enunciado.
+
+\textbf{Apoio da IA.} O assistente auxiliou na elaboração
+inicial do arquivo \texttt{Grammar.y} e na investigação
+dos conflitos reportados pelo gerador Happy.
+
+\textbf{Análise e decisões.} A primeira versão apresentou
+16 conflitos \emph{shift/reduce}. A investigação utilizou
+o arquivo de informações gerado pelo comando
+\texttt{happy --info}, que indicou que os conflitos estavam
+concentrados em um único estado e relacionados à produção
+do corpo da \emph{lambda}.
+
+A primeira tentativa de resolução sugerida, por meio da
+declaração \texttt{\%right 'lambda'}, não produziu efeito.
+A análise mostrou que, no Happy, a precedência de uma
+produção é herdada de seu último terminal, que naquela
+regra era o símbolo \texttt{:}. A solução adotada foi
+introduzir o pseudo-\emph{token} \texttt{LAMBDA}, com a
+menor precedência da tabela, e utilizar
+\texttt{\%prec LAMBDA} para sobrescrever a precedência
+da produção. Com essa alteração, os conflitos foram
+eliminados.
+
+Também foram identificadas dependências ausentes na
+configuração do projeto: \texttt{array}, exigida pelo
+código gerado, e \texttt{build-tool-depends: happy:happy}
+no arquivo \texttt{.cabal}.
+
+\textbf{Validação.} A saída de diagnóstico do Happy foi
+utilizada para localizar os conflitos, e a geração do
+analisador foi repetida após as alterações, até que
+não fossem mais reportados conflitos.
+
+\subsection{Apoio na elaboração e validação dos testes}
+
+\textbf{Contexto da interação.} Era necessário construir
+programas de teste com base nos exemplos da Seção 9 da
+especificação e verificar se os três analisadores
+apresentavam resultados equivalentes.
+
+\textbf{Apoio da IA.} O assistente auxiliou na elaboração
+de nove programas válidos, sete programas inválidos e
+dos \emph{scripts} \texttt{testes/rodar.sh} e
+\texttt{testes/gerar-saidas.sh}, utilizados na execução
+e comparação dos analisadores.
+
+\textbf{Análise e decisões.} A primeira execução do
+comparativo apresentou falsos positivos: como a compilação
+estava quebrada, os dois lados da comparação retornavam
+saídas vazias, que eram interpretadas pelo \texttt{diff}
+como iguais. O \emph{script} foi então modificado para
+armazenar as saídas em arquivos e verificar se elas
+não estavam vazias antes de realizar a comparação.
+
+\textbf{Validação.} Os testes foram executados novamente
+após a correção do \emph{script}. A verificação passou
+a considerar não apenas a igualdade entre as saídas,
+mas também se os programas haviam sido executados
+corretamente e produzido resultados.
+
+\subsection{Limitações e avaliação das respostas}
+
+Durante o desenvolvimento, algumas respostas fornecidas
+pela ferramenta apresentaram inconsistências ou não
+consideraram completamente as particularidades do ambiente
+e da especificação da disciplina. Entre os casos
+identificados estavam a indicação de um atributo
+inexistente na configuração do Nix, uma interpretação
+incorreta sobre o funcionamento do Alex e uma tentativa
+inicial de resolver os conflitos de precedência do Happy
+que não produziu o efeito esperado.
+
+Essas situações evidenciaram a importância de avaliar
+criticamente as sugestões recebidas. Para isso, foram
+consultados o material disponibilizado pelo professor,
+a documentação das bibliotecas e os resultados obtidos
+com a compilação e os testes. As sugestões que não
+atendiam aos requisitos foram corrigidas, adaptadas
+ou descartadas.
+
+A experiência mostrou que a IA foi útil como apoio
+à investigação e à implementação, especialmente para
+explorar alternativas e acelerar a identificação de
+possíveis causas de erros. Entretanto, a correção das
+soluções dependia de sua verificação no contexto real
+do projeto.
 
 \subsection{Síntese}
 
-O assistente gerou o código dos módulos a partir de especificações
-discutidas previamente, e a autora foi responsável pelas decisões de
-projeto, pela verificação de cada módulo e pelas correções. Nenhum trecho
-foi incorporado ao repositório sem compilar com \texttt{-Wall -Werror} e sem
-passar nos testes. As decisões que contrariaram a sugestão inicial do
-assistente, como a escolha do Megaparsec em lugar da biblioteca PEG da
-disciplina, a reescrita da produção \texttt{Alvo} e a mudança na convenção
-de posição dos nós, estão indicadas nas subseções correspondentes, assim
-como as duas afirmações incorretas do assistente que foram detectadas pela
-consulta ao material da disciplina.
+A IA generativa foi utilizada como assistente técnico
+durante diferentes etapas do trabalho. Sua contribuição
+envolveu a organização do desenvolvimento, a consulta
+sobre conceitos e bibliotecas, a discussão de alternativas
+de projeto, a elaboração de trechos de código e o apoio
+na investigação de falhas.
+
+A participação da ferramenta foi especialmente útil
+em tarefas que exigiram integração entre componentes,
+como o tratamento de indentação, a construção dos
+analisadores sintáticos e a resolução de conflitos
+de precedência no Happy. Ao mesmo tempo, as interações
+também permitiram identificar limitações nas respostas
+e a necessidade de confrontá-las com a especificação
+e com o material da disciplina.
+
+O desenvolvimento foi conduzido de forma incremental,
+com compilação utilizando \texttt{-Wall -Werror},
+execução de testes e registro das alterações no Git.
+As sugestões da ferramenta não foram incorporadas
+automaticamente: foram analisadas, adaptadas e
+validadas de acordo com os requisitos do trabalho.
+Assim, a IA atuou como recurso de apoio à implementação
+e à resolução de problemas, enquanto as decisões de
+projeto, a análise crítica e a validação final do
+compilador permaneceram sob responsabilidade da autora.
+```

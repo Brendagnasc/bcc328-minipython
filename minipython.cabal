@@ -17,6 +17,7 @@ extra-source-files: exemplos/**/*.mpy
                     exemplos/**/*.err
                     spec/minipython.md
                     report/relatorio.tex
+                    report/uso-ia.tex
                     testes/*.sh
                     testes/saidas-esperadas.txt
 

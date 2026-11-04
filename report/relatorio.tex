@@ -2,6 +2,8 @@
 \usepackage[utf8]{inputenc}
 \usepackage[brazil]{babel}
 \usepackage[T1]{fontenc}
+% Fontes vetoriais; sem isso o T1 cai nas fontes em bitmap.
+\usepackage{lmodern}
 \usepackage{geometry}
 \usepackage{graphicx}
 \usepackage{hyperref}
@@ -349,6 +351,7 @@ opção vale \texttt{-{}-parse-rd}. Os testes rodam com
 \texttt{cabal test} ou \texttt{bash testes/rodar.sh}.
 
 \subsection{Testes Realizados}
+\label{sec:testes}
 
 São 88 programas em \texttt{exemplos/}: os do repositório, os
 fornecidos com o enunciado e os 15 da seção 9 da especificação. Os 27
@@ -397,10 +400,14 @@ apontado no \texttt{\textbackslash n} dessa linha, e não no
 \texttt{NEWLINE} que o analisador léxico gera no fim do arquivo.
 
 \section{Uso de IA generativa}
+\label{sec:usoia}
 
-O registro dos prompts utilizados, das respostas obtidas e das
-modificações feitas, pedido no item 4 da seção 8 do enunciado, está no
-Apêndice~\ref{sec:ia}, fora do limite de seis páginas do relatório.
+O assistente Claude (Anthropic) foi usado em duas etapas. Na primeira, ele
+gerou o código dos módulos a partir de especificações discutidas caso a
+caso; na segunda, já com a versão final do enunciado, o Claude Code alterou
+o código direto no repositório e redigiu boa parte deste relatório. Os
+prompts, as respostas e as modificações, pedidos no item 4 da seção 8 do
+enunciado, estão no Apêndice~\ref{sec:ia}, fora do limite de seis páginas.
 
 \section{Conclusão}
 

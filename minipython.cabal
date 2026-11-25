@@ -20,6 +20,8 @@ extra-source-files: exemplos/**/*.mpy
                     spec/minipython.md
                     report/relatorio.tex
                     report/uso-ia.tex
+                    report/relatorio-tp2.tex
+                    report/uso-ia-tp2.tex
                     testes/*.sh
                     testes/saidas-esperadas.txt
                     testes/saidas-tp2.txt

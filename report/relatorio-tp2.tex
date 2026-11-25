@@ -1,0 +1,520 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage[T1]{fontenc}
+% Fontes vetoriais; sem isso o T1 cai nas fontes em bitmap.
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+% Codigo e saidas curtas, sem numero de linha.
+\lstdefinestyle{gram}{style=mystyle, numbers=none, basicstyle=\ttfamily\scriptsize}
+
+% Evita linhas estouradas por trechos longos em \texttt.
+\setlength{\emergencystretch}{1em}
+
+% Nomes de tipo nas regras.
+\newcommand{\ty}[1]{\mathsf{#1}}
+
+\title{Relatório de Projeto: Compilador MiniPython\\[4pt]
+\large Trabalho Prático 2: Verificação de Tipos e Interpretação}
+\author{
+    Brenda Gabrielle Alves Nascimento \\
+    Matrícula: 24.1.4011 \\
+    BCC328 - Construção de Compiladores I - DECOM/UFOP
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Segunda etapa do compilador MiniPython, em Haskell: um verificador de
+tipos estático, baseado em unificação e com subtipagem entre classes, e
+um interpretador que executa a AST dos programas bem tipados. Os dois
+entram no executável \texttt{mpyc} pelas opções \texttt{-{}-check} e
+\texttt{-{}-run}.
+\end{abstract}
+
+\section{Introdução}
+
+O TP1 deixou prontos o analisador léxico e os três parsers, que
+produzem a mesma AST. Este trabalho acrescenta as duas fases seguintes:
+a verificação de tipos, que confere as regras da seção 10 da
+especificação e acumula todos os erros encontrados, e a interpretação,
+que executa a AST quando a verificação passa. Com \texttt{-{}-check} e
+\texttt{-{}-run}, o programa é lido pelo analisador descendente
+recursivo; qualquer um dos três serviria, já que a AST é a mesma. O
+código novo está em \texttt{src/MiniPython/Semantic} (tipos e
+verificador) e \texttt{src/MiniPython/Interpreter} (valores e
+interpretador).
+
+\section{Metodologia}
+
+\subsection{Sistema de tipos para MiniPython}
+
+Os tipos do verificador (\texttt{Semantic/Types.hs}) são separados das
+anotações da AST, que carregam posição:
+
+\begin{lstlisting}[style=gram]
+data Ty = TInt | TFloat | TBool | TStr | TNone
+        | TList Ty | TFun [Ty] Ty | TClass Name
+        | TGen Name     -- variavel de tipo escrita na anotacao (a, b, ...)
+        | TMeta Int     -- incognita criada pela inferencia (?0, ?1, ...)
+\end{lstlisting}
+
+O ambiente de tipos é uma pilha de escopos, cada um um mapa de nomes
+para \texttt{BVar} (variável ou parâmetro, com o seu tipo),
+\texttt{BFun} (função declarada com \texttt{def}, com um esquema de
+tipo) ou \texttt{BClass}. Cada bloco empilha um escopo, descartado na
+saída, e o escopo global fica à parte. O corpo de uma função começa com
+um escopo só com os parâmetros e não enxerga os escopos locais de quem
+a definiu, porque \texttt{def} não forma closure (regra 7 da seção 10);
+o global continua visível. O ambiente de classes guarda, para cada
+classe, o pai, os campos e os métodos, já somados aos herdados, cada
+método com a classe que o definiu.
+
+As regras principais estão abaixo, com $\Gamma$ o ambiente,
+$\sigma \le \tau$ a subtipagem e $\Leftarrow$ a verificação contra um
+tipo esperado, usada na lambda. A regra de \texttt{+} vale também para
+\texttt{str}, porque os exemplos da especificação concatenam strings, e
+\texttt{**} segue a mesma regra de \texttt{-} e \texttt{*}.
+
+\begin{gather*}
+\frac{x : \tau \in \Gamma}{\Gamma \vdash x : \tau}
+\qquad
+\frac{\Gamma \vdash e_1 : \tau \quad \Gamma \vdash e_2 : \tau \quad \tau \in \{\ty{int}, \ty{float}\}}
+     {\Gamma \vdash e_1 \oplus e_2 : \tau}\ {\scriptstyle \oplus \in \{+,-,*,**\}}
+\\[8pt]
+\frac{\Gamma \vdash e_1 : \tau \quad \Gamma \vdash e_2 : \tau \quad \tau \in \{\ty{int}, \ty{float}\}}
+     {\Gamma \vdash e_1 \,/\, e_2 : \ty{float}}
+\qquad
+\frac{\Gamma \vdash e_1 : \ty{int} \quad \Gamma \vdash e_2 : \ty{int}}
+     {\Gamma \vdash e_1 \odot e_2 : \ty{int}}\ {\scriptstyle \odot \in \{//, \%\}}
+\\[8pt]
+\frac{\Gamma \vdash e_1 : \tau \quad \Gamma \vdash e_2 : \tau \quad \tau \in \{\ty{int}, \ty{float}, \ty{str}\}}
+     {\Gamma \vdash e_1 < e_2 : \ty{bool}}
+\qquad
+\frac{\Gamma \vdash e_1 : \ty{list}[\tau] \quad \Gamma \vdash e_2 : \ty{int}}
+     {\Gamma \vdash e_1[e_2] : \tau}
+\\[8pt]
+\frac{\Gamma \vdash f : (\tau_1, \ldots, \tau_n) \to \tau \quad \Gamma \vdash e_i : \sigma_i \quad \sigma_i \le \tau_i}
+     {\Gamma \vdash f(e_1, \ldots, e_n) : \tau}
+\qquad
+\frac{\Gamma \vdash e : C \quad \mathit{campos}(C)(f) = \tau}
+     {\Gamma \vdash e.f : \tau}
+\\[8pt]
+\frac{\texttt{class}\ D(C)}{D \le C}
+\qquad
+\frac{}{\tau \le \tau}
+\qquad
+\frac{\tau_1 \le \tau_2 \quad \tau_2 \le \tau_3}{\tau_1 \le \tau_3}
+\\[8pt]
+\frac{\Gamma, x_1 : \tau_1, \ldots, x_n : \tau_n \vdash e \Leftarrow \tau}
+     {\Gamma \vdash \texttt{lambda}\ x_1, \ldots, x_n\texttt{:}\ e \Leftarrow (\tau_1, \ldots, \tau_n) \to \tau}
+\end{gather*}
+
+As regras da seção 2.3 do enunciado ficam assim:
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item o nome é procurado nos escopos locais, no global e, por último,
+  entre as primitivas; se não aparece, o erro é \texttt{undeclared
+  variable};
+\item operadores conforme as regras acima; \texttt{and}, \texttt{or} e
+  \texttt{not} exigem \texttt{bool}, e \texttt{==} e \texttt{!=}, dois
+  valores do mesmo tipo (dois objetos, se um for subclasse do outro);
+\item na chamada, o número e o tipo dos argumentos; com aridade errada a
+  mensagem mostra os dois tipos de função, como no \texttt{.err} do
+  enunciado: \texttt{incompatible types: '(int, int) -> int' and
+  '(int, int, int) -> ?0'};
+\item a expressão do \texttt{return} contra o tipo de retorno, com
+  subtipagem;
+\item um bloco retorna em todos os caminhos se algum comando dele
+  retorna: um \texttt{return}, um \texttt{if} com \texttt{else} em que
+  todos os ramos retornam ou um \texttt{while True} sem \texttt{break};
+\item \texttt{break} e \texttt{continue} só com o indicador de laço
+  ligado, que é desligado na entrada de cada função;
+\item nome repetido no escopo corrente, e campo ou método repetido na
+  classe;
+\item campo e método procurados no ambiente de classes, que já inclui
+  os herdados;
+\item subtipagem pela cadeia de pais;
+\item override com os mesmos tipos de parâmetro e de retorno, exceto o
+  \texttt{\_\_init\_\_}, que pode mudar (\texttt{Quadrado} recebe um
+  lado, \texttt{Retangulo} recebe dois).
+\end{enumerate}
+
+\texttt{len}, \texttt{append}, \texttt{int}, \texttt{float} e
+\texttt{str} são casos especiais, com as regras da seção 2.3 do
+enunciado; \texttt{print}, \texttt{input}, \texttt{bool} e
+\texttt{range} têm tipo fixo, e \texttt{xs.append(e)} vale como
+\texttt{append(xs, e)}. Também são verificados \texttt{self} fora de
+método (regra 14), o \texttt{\_\_init\_\_} que não atribui algum campo
+da classe (regra 13) e a lista vazia sem anotação (seção 6.8).
+
+A subtipagem~\cite{pierce2002} só existe entre classes e entra onde um
+valor é usado no lugar de outro: declaração, atribuição, argumento, retorno e elemento de
+lista quando o tipo esperado é conhecido. Listas e funções são
+invariantes: \texttt{list[Quadrado]} não serve onde se espera
+\texttt{list[Forma]}. Num literal de lista ou numa condicional sem tipo
+esperado, duas classes diferentes resultam no ancestral comum mais
+próximo.
+
+\subsection{Inferência de tipos para MiniPython}
+
+Onde falta anotação o verificador cria uma incógnita (\texttt{TMeta}),
+resolvida por unificação~\cite{damas1982}: parâmetro de lambda, lista
+vazia, parâmetro ou retorno sem anotação e as variáveis de tipo de uma
+função polimórfica a cada chamada. A substituição fica num
+\texttt{IntMap}, e ligar \texttt{?0} a um tipo que contém \texttt{?0}
+é recusado (occurs check, regra 21). Quando a unificação falha, o erro
+mostra o par mais interno que não casou: \texttt{list[int]} contra
+\texttt{list[str]} dá \texttt{'int' and 'str'}. Na aridade errada não
+há par interno, e saem os dois tipos de função inteiros.
+
+Uma função com variáveis de tipo nas anotações tem um esquema
+$\forall a\,b.\,\tau$. Dentro do corpo, \texttt{a} e \texttt{b} são
+rígidas (\texttt{TGen}): \texttt{return 1} numa função
+\texttt{-> a} é erro. Cada chamada troca as variáveis por incógnitas
+novas, e por isso \texttt{identidade(42)} e
+\texttt{identidade("olá")} convivem. Uma função de nível superior sem
+anotação é verificada com incógnitas, e as que sobram na assinatura, e
+não aparecem em outro nome global, viram variáveis de tipo (regra 19);
+funções locais não são generalizadas.
+
+A verificação é bidirecional~\cite{dunfield2021}: \texttt{check}
+recebe o tipo esperado e o passa para dentro de lambda, literal de lista
+e condicional; o resto é inferido e comparado com subtipagem. É assim
+que os parâmetros de uma lambda ganham tipo, já que a sintaxe não deixa
+anotá-los. Numa chamada, os argumentos que não são lambda são
+verificados primeiro. Em \texttt{fold(lambda acc, x: acc + x, 0, nums)},
+o \texttt{0} e o \texttt{nums} resolvem \texttt{b = int} e
+\texttt{a = int} antes de a lambda ser tipada, e \texttt{acc + x} é
+\texttt{int + int}; na ordem do fonte, \texttt{+} receberia duas
+incógnitas e não teria como escolher entre \texttt{int}, \texttt{float}
+e \texttt{str}.
+
+Uma declaração sem anotação, \texttt{x = e}, recebe o tipo de
+\texttt{e}. Se ele ainda tem incógnita, como em \texttt{z = []} ou
+\texttt{f = lambda x: x}, o erro é \texttt{cannot infer the type of
+'z'} (regra 18).
+
+\subsection{Semântica operacional para MiniPython}
+
+O interpretador segue uma semântica de passos grandes:
+\texttt{eval} leva uma expressão e o ambiente a um valor, e
+\texttt{exec} executa um comando e diz como ele terminou
+(\texttt{Normal}, \texttt{Break}, \texttt{Continue} ou
+\texttt{Return v}). Um bloco executa os comandos em ordem até um deles
+terminar de outro jeito que não \texttt{Normal}; o laço consome
+\texttt{Break} e \texttt{Continue}, e a chamada consome
+\texttt{Return}.
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item \texttt{/} entre inteiros dá \texttt{float}; \texttt{//} e
+  \texttt{\%} arredondam para baixo, como no Python (\texttt{div} e
+  \texttt{mod} do Haskell); \texttt{and} e \texttt{or} param no
+  primeiro operando que decide o resultado.
+\item Na chamada, a função e depois os argumentos são avaliados da
+  esquerda para a direita; os parâmetros vão para um escopo novo,
+  colocado sobre os escopos que a função enxerga: só o global, para
+  uma função de nível superior, e ela mesma e o global, para uma
+  função local. O resultado é o valor do \texttt{Return}, ou
+  \texttt{None}.
+\item A lambda guarda a lista de escopos de onde foi criada (a
+  closure); na chamada, os parâmetros entram num escopo sobre essa
+  lista.
+\item \texttt{C(args)} cria um objeto com todos os campos, próprios e
+  herdados, valendo \texttt{None}, e chama o \texttt{\_\_init\_\_} da
+  classe ou do ancestral mais próximo, com o objeto como
+  \texttt{self}.
+\item \texttt{obj.m} procura o método a partir da classe concreta do
+  objeto, o que dá o despacho dinâmico, e devolve o método já ligado ao
+  objeto; \texttt{C.m} procura a partir de \texttt{C}, e é assim que
+  \texttt{Retangulo.\_\_init\_\_(self, lado, lado)} funciona.
+\item O \texttt{for} percorre a lista pelo índice, relendo-a a cada
+  volta, e cada volta abre um escopo com a variável do laço.
+\item \texttt{x = e} atualiza \texttt{x} se ele está visível e, se não,
+  declara \texttt{x} no escopo mais interno. Dentro de função o global
+  não conta para a atribuição, como no Python sem \texttt{global}:
+  \texttt{x = e} cria uma local.
+\item São erros de execução o índice fora de $[0, \mathit{len}-1]$
+  (regra 5; índice negativo não vale), a divisão por zero, a conversão
+  de uma string que não é número e o fim da entrada em
+  \texttt{input()}.
+\end{itemize}
+
+\section{Arquitetura do Compilador}
+
+\subsection{Posição dos nós}
+
+No TP1 a posição de um nó era a do início da construção. Os
+\texttt{.err} de \texttt{invalid/semantic} fornecidos com o enunciado
+apontam outro lugar: em \texttt{z: float = x + y}, o erro do
+\texttt{e01} está na coluna 18, a do \texttt{+}; nos de indexação, no
+\texttt{[}; nos de chamada, no \texttt{(}. Por isso operador binário,
+chamada, indexação e acesso a campo passaram a guardar a posição do
+operador (o \texttt{.} no acesso a campo), nos três parsers; no PEG ela
+é capturada com \texttt{@} logo antes do operador. O início da
+expressão, que ainda é a posição de um comando e do erro de alvo de
+atribuição, sai da função \texttt{exprStart}. Os testes do TP1
+continuaram passando, inclusive a comparação das ASTs com posições.
+
+\subsection{Análise semântica}
+
+O verificador (\texttt{Semantic/TypeChecker.hs}) roda numa mônada de
+estado com a substituição, o contador de incógnitas, os erros
+acumulados, os escopos locais, o global, o ambiente de classes, a
+função corrente (tipo de retorno e classe de \texttt{self}) e o
+indicador de laço. São duas passadas. Na primeira, as classes e as
+funções de nível superior entram no escopo global antes de qualquer
+corpo, o que permite recursão e referência mútua; o ambiente de classes
+é montado com o pai antes do filho, a herança circular é cortada e
+reportada, e o override é conferido aqui. Na segunda, cada item é
+verificado na ordem do fonte, de modo que uma função enxerga as
+variáveis globais declaradas antes dela.
+
+O verificador não para no primeiro erro. Cada erro é guardado, e a
+expressão errada recebe um tipo razoável para a verificação seguir:
+um \texttt{\%} com erro dá \texttt{int}, um \texttt{==} dá
+\texttt{bool}, um \texttt{+} dá o tipo do operando da esquerda e uma
+chamada com aridade errada dá o retorno declarado. Variável não
+declarada e indexação inválida dão uma incógnita nova, que unifica com
+qualquer coisa e não gera erros em cascata. No \texttt{e01} saem dois
+erros, o do \texttt{+} e o da declaração, porque o \texttt{+} com erro
+dá \texttt{int}, que não serve para \texttt{float}; no \texttt{e09},
+\texttt{[1, 2.0, 3]}, sai um só.
+
+As mensagens estão em inglês, como nos \texttt{.err}, com os tipos
+escritos como nas anotações. As incógnitas são renumeradas a partir de
+\texttt{?0} em cada mensagem, para que o texto não dependa de quantas
+foram criadas antes. Depois dos erros vem uma linha em branco, porque
+os \texttt{.err} do enunciado terminam assim. As verificações de
+\texttt{return}, \texttt{break} e \texttt{continue} fora de lugar, que
+no TP1 ficavam só em \texttt{Validate.hs}, são repetidas no verificador,
+para que em \texttt{-{}-check} apareçam junto com os outros erros; nos
+modos \texttt{-{}-parse-*} continua valendo o \texttt{Validate}.
+
+\subsection{Interpretador}
+
+A representação dos valores (\texttt{Interpreter/Value.hs}) segue a
+sugestão da seção 3.1 do enunciado:
+
+\begin{center}
+\begin{tabular}{ll}
+\hline
+MiniPython & Valor \\
+\hline
+\texttt{int}, \texttt{float}, \texttt{bool}, \texttt{str} & \texttt{Integer}, \texttt{Double}, \texttt{Bool}, \texttt{String} \\
+\texttt{None} & \texttt{VNone} \\
+\texttt{list[T]} & \texttt{IORef (Seq Value)} \\
+objeto & classe concreta, identificador e \texttt{Map Name (IORef Value)} \\
+função \texttt{def} & \texttt{VFun FunDef [Scope]} \\
+lambda & \texttt{VLambda [Name] Expr [Scope]} \\
+\hline
+\end{tabular}
+\end{center}
+
+Há ainda \texttt{VPartial}, uma função com os primeiros argumentos já
+dados, que é o que \texttt{obj.m} e \texttt{xs.append} devolvem;
+\texttt{VClass}, o nome de classe, que chamado cria um objeto; e
+\texttt{VBuiltin}, as primitivas. O ambiente é uma lista de escopos,
+\texttt{IORef (Map Name (IORef Value))}, o mais interno primeiro e o
+global por último. Cada variável tem a sua \texttt{IORef}, então a
+atribuição muda o valor no escopo em que a variável foi declarada, e a
+closure vê as mudanças feitas depois de criada, como no Python.
+
+Erro de execução é uma exceção com posição, capturada em
+\texttt{runProgram}, que devolve \texttt{Either Error ()}; o executável
+esvazia a saída padrão antes de imprimir a mensagem. A entrada e a
+saída do programa passam por um registro com as ações de ler e de
+escrever uma linha: o executável usa \texttt{stdin} e \texttt{stdout},
+e o \texttt{cabal test} usa listas de linhas, sem chamar o executável.
+\texttt{str} de um \texttt{float} segue o \texttt{repr} do Python:
+menor quantidade de dígitos que identifica o número
+(\texttt{floatToDigits}) e expoente fora de $[10^{-4}, 10^{16})$, então
+\texttt{0.1 + 0.2} dá \texttt{0.30000000000000004} e \texttt{1e16} dá
+\texttt{1e+16}.
+
+\section{Resultados e Discussão}
+
+\subsection{Instruções de Uso}
+
+Com GHC 9.6 e cabal: \texttt{cabal update} e \texttt{cabal build}. A
+verificação é \texttt{cabal run mpyc -{}- -{}-check exemplos/fib.mpy},
+que não imprime nada se o programa está bem tipado, e a execução é
+\texttt{cabal run mpyc -{}- -{}-run exemplos/mdc.mpy < exemplos/mdc.in},
+que só roda o programa se a verificação passar. Os testes rodam com
+\texttt{cabal test} ou \texttt{bash testes/rodar.sh}, e
+\texttt{bash testes/gerar-saidas.sh} regenera
+\texttt{testes/saidas-tp2.txt}, com código, entrada e saída esperada dos
+casos da seção 5 do enunciado.
+
+\subsection{Testes Realizados}
+
+São 106 programas em \texttt{exemplos/}. Os 46 válidos têm que passar
+no verificador e ter a saída igual ao \texttt{.out} ao lado, com a
+entrada do \texttt{.in} quando o programa lê dados (13 deles). Os 30 de
+\texttt{invalid/semantic} (os 15 do enunciado e \texttt{e16} a
+\texttt{e30}) têm que dar em \texttt{-{}-check} exatamente o
+\texttt{.err}. Os 3 de \texttt{invalid/runtime} passam no verificador e
+terminam com o erro de execução do \texttt{.err}, e os 27 de erro léxico
+ou sintático vêm do TP1. Os 106 passam nas duas suítes. Os casos pedidos
+na seção 5 do enunciado são:
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ll|ll}
+\hline
+Caso válido & Programa & Caso de erro & Programa \\
+\hline
+MDC & \texttt{secao\_9\_01\_mdc} & variável não declarada & \texttt{e05} \\
+Fibonacci & \texttt{secao\_9\_02\_fibonacci} & \texttt{int + str} & \texttt{e16} \\
+busca linear & \texttt{secao\_9\_03\_busca\_linear} & aridade errada & \texttt{e04} \\
+seleção & \texttt{secao\_9\_04\_selecao} & falta de \texttt{return} & \texttt{e03} \\
+\texttt{map} e \texttt{filter} & \texttt{secao\_9\_08\_alta\_ordem} & \texttt{break}/\texttt{continue} fora de laço & \texttt{e17} \\
+formas & \texttt{secao\_9\_11\_formas} & campo inexistente & \texttt{e18} \\
+pilha & \texttt{secao\_9\_12\_pilha} & & \\
+lambdas & \texttt{secao\_9\_15\_lambdas} & & \\
+\hline
+\end{tabular}
+\end{center}
+
+Os outros programas de erro cobrem as demais regras (método
+inexistente, override, um \texttt{Animal} onde se espera
+\texttt{Cachorro}, redeclaração, escopo de bloco, campo não
+inicializado, \texttt{self} fora de método, entre outras), e um deles
+tem cinco erros, para mostrar o acúmulo:
+
+\begin{lstlisting}[style=gram]
+e26_varios_erros.mpy:2:5: error: incompatible types: 'float' and 'int'
+e26_varios_erros.mpy:5:17: error: operator '/' requires operands of the same type (int or float), got 'float' and 'int'
+e26_varios_erros.mpy:8:26: error: incompatible types: 'float' and 'str'
+e26_varios_erros.mpy:9:21: error: operator '+' requires operands of the same type (int or float), got 'str' and 'float'
+e26_varios_erros.mpy:10:15: error: undeclared variable: 'total'
+\end{lstlisting}
+
+As saídas dos válidos foram conferidas com o Python 3: os mesmos
+programas, sem as anotações de tipo (\texttt{(int) -> int} não é
+sintaxe Python) e com \texttt{append} e \texttt{range} definidos,
+deram as 46 saídas iguais. Os \texttt{.err} do enunciado passam byte a
+byte, menos o do \texttt{e03}, que veio vazio; como o TP2 pede a regra
+5, ele agora tem \texttt{missing return in function 'f'}.
+
+\subsection{Dificuldades encontradas}
+
+\paragraph{Posição dos erros.} A convenção do TP1, posição no início
+da construção, foi escolhida pensando nos erros de tipo, mas os
+\texttt{.err} do enunciado apontam o operador. Foi preciso voltar
+atrás nos três parsers, guardar a posição do operador e criar
+\texttt{exprStart} para os lugares que usavam o início.
+
+\paragraph{Unificação e subtipagem.} Unificar o tipo da função com o
+tipo dos argumentos, como sugerem os \texttt{.err}, recusaria
+\texttt{imprimir(r)} com \texttt{r} do tipo \texttt{Retangulo} e o
+parâmetro do tipo \texttt{Forma}. A subtipagem ficou só nos pontos em
+que um valor é usado no lugar de outro, comparando classes pela cadeia
+de pais, e a unificação no resto.
+
+\paragraph{Lambdas sem anotação.} Inferida sozinha, uma lambda como
+\texttt{lambda acc, x: acc + x} tem dois parâmetros de tipo
+desconhecido, e \texttt{+} não sabe qual regra aplicar. A solução foi a
+verificação bidirecional com os argumentos que não são lambda
+verificados antes.
+
+\paragraph{Erros em cascata.} Na primeira versão,
+\texttt{self.valor = self.valor + 1} numa função comum gerava cinco
+mensagens. O \texttt{self} fora de método passou a ser um parâmetro de
+tipo desconhecido, com um erro só, e o acesso a campo de um valor de
+tipo desconhecido, que já vem de um erro, deixou de gerar mensagem.
+
+\paragraph{Variável global dentro de função.} A primeira versão deixava
+a função reatribuir uma global. A comparação com o Python mostrou a
+diferença: lá, \texttt{contador = 5} dentro da função cria uma local, e
+\texttt{g = g + 1} é erro. Como o enunciado manda adotar o Python
+quando a especificação é omissa, \texttt{x = e} passou a criar uma
+local e \texttt{x += e} numa global passou a ser erro de compilação.
+
+\paragraph{Formato dos \texttt{.err}.} Com as mensagens já iguais, o
+\texttt{cabal test} ainda falhava nos 14 \texttt{.err} do enunciado: os
+arquivos terminam com uma linha em branco a mais, que o
+\texttt{-{}-check} passou a imprimir.
+
+\subsection{Limitações}
+
+A lambda enxerga todos os escopos de fora, enquanto a especificação
+limita a captura ao escopo imediatamente envolvente e ao global. Listas
+e funções são invariantes, sem a contravariância dos parâmetros. A
+regra 13 só confere se cada campo é atribuído em algum ponto do
+\texttt{\_\_init\_\_}, e não em todos os caminhos nem antes do uso.
+Duas funções sem anotação que se chamam uma à outra ficam monomórficas,
+porque a generalização é feita depois de verificar cada uma.
+\texttt{int}, \texttt{float} e \texttt{str} só podem ser chamadas, e não
+usadas como valor, porque aceitam mais de um tipo de argumento.
+
+\section{Uso de IA generativa}
+
+Como no TP1, foi usado o assistente Claude (Anthropic), agora pelo
+Claude Code. Ele escreveu o código do verificador, do interpretador e
+dos testes e o rascunho deste relatório; os prompts, as respostas e as
+modificações (item 4 da seção 6 do enunciado) estão no
+Apêndice~\ref{sec:ia}, fora do limite de oito páginas.
+
+\section{Conclusão}
+
+O verificador confere as dez regras pedidas e reproduz os
+\texttt{.err} do enunciado, e o interpretador dá as mesmas saídas do
+Python. O mais trabalhoso foi juntar unificação, necessária para
+lambdas e funções polimórficas, com subtipagem entre classes.
+
+\begin{thebibliography}{9}
+\setlength{\itemsep}{0pt}
+\bibitem{pierce2002}
+Pierce, B. C. (2002). \emph{Types and Programming Languages}. MIT Press.
+
+\bibitem{damas1982}
+Damas, L.; Milner, R. (1982). Principal type-schemes for functional programs. In \emph{POPL '82}. ACM.
+
+\bibitem{dunfield2021}
+Dunfield, J.; Krishnaswami, N. (2021). Bidirectional Typing. \emph{ACM Computing Surveys}, 54(5).
+\end{thebibliography}
+
+\clearpage
+\appendix
+\input{uso-ia-tp2}
+
+\end{document}

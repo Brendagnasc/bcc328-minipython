@@ -220,6 +220,7 @@ test/Main.hs                     suíte do cabal test
 testes/                          scripts de teste e saídas esperadas
 exemplos/                        programas de teste
 docs/gramatica.md                GLC, gramática PEG e conflitos do LALR
-report/relatorio.tex             relatório
+report/relatorio.tex             relatório do TP1
+report/relatorio-tp2.tex         relatório do TP2
 spec/minipython.md               especificação da linguagem
 ```

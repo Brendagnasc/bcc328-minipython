@@ -1,0 +1,121 @@
+% Apendice do relatorio do TP2: uso de IA generativa (item 4 da
+% secao 6 do enunciado). Fica fora do limite de oito paginas.
+
+\section{Uso de IA generativa no TP2}
+\label{sec:ia}
+
+A ferramenta foi o Claude Code (Anthropic), com o modelo Claude Opus
+5.5, numa única sessão em 25/11/2026, aberta no diretório do
+repositório. Nela a ferramenta lia arquivos, rodava comandos
+(\texttt{cabal}, os testes, o Python) e editava o código. Os prompts
+estão abaixo como foram digitados, sem correção. Os três últimos
+respondem a perguntas que a ferramenta fez ao fim da resposta anterior.
+
+\subsection*{Prompt 1}
+
+\begin{quote}
+vamos continuar esse trabalho analise o repositorio veja oq da pra
+melhorar e fazer as modificações necessarias para o TP2\\
+\url{https://github.com/Brendagnasc/bcc328-minipython}\\
+\emph{[texto completo do enunciado do TP2, colado]}\\
+Repositorio do professor\\
+\url{https://github.com/rodrigogribeiro/bcc328-2026-2}
+\end{quote}
+
+\textbf{Resposta.} A ferramenta leu o repositório, a especificação e o
+repositório do professor, que não tinha material do TP2 além das notas
+de aula. Concluiu que os \texttt{.err} de \texttt{invalid/semantic},
+fornecidos com o enunciado do TP1, vinham de um verificador de
+referência e serviam de modelo para as mensagens e as posições. Em
+seguida:
+
+\begin{enumerate}\setlength{\itemsep}{0pt}
+\item mudou a posição guardada nos nós de operador, chamada, indexação
+  e acesso a campo nos três parsers, criou \texttt{exprStart} e
+  confirmou que os 88 testes do TP1 continuavam passando;
+\item escreveu \texttt{Semantic/Types.hs} e
+  \texttt{Semantic/TypeChecker.hs}, com as decisões descritas na
+  Seção 2, e \texttt{Interpreter/Value.hs} e
+  \texttt{Interpreter/Interp.hs};
+\item acrescentou \texttt{-{}-check} e \texttt{-{}-run} em
+  \texttt{CLI.hs} e \texttt{app/Main.hs};
+\item comparou a saída de \texttt{-{}-check} com os 15 \texttt{.err}
+  do enunciado: 14 iguais, e o \texttt{e03} diferente por estar vazio;
+\item escreveu, fora do repositório, um tradutor de MiniPython para
+  Python que tira as anotações de tipo, e comparou as saídas dos 46
+  programas válidos com as do Python 3;
+\item criou os programas \texttt{e16} a \texttt{e30}, os de
+  \texttt{invalid/runtime} e os arquivos \texttt{.in} e \texttt{.out},
+  atualizou as duas suítes de testes e o \emph{script} que gera as
+  saídas esperadas, e escreveu o README e o CHANGELOG do TP2.
+\end{enumerate}
+
+\textbf{Modificações.} Durante a própria sessão, estes pontos da
+resposta foram corrigidos depois de compilar ou testar:
+
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item duas partes do interpretador foram reescritas antes de compilar:
+  a atribuição aumentada num elemento de lista, cuja primeira versão
+  não gravava o valor novo de volta na lista, e a função de
+  comparação, que usava um tipo que precisaria de uma extensão do GHC
+  não habilitada;
+\item a primeira versão deixava uma função reatribuir uma variável
+  global; a comparação com o Python mostrou que lá isso cria uma
+  variável local, e a regra foi trocada pela do Python;
+\item \texttt{z = []} sem anotação era aceito e passou a ser erro, como
+  pede a seção 6.8 da especificação, e a mensagem
+  \texttt{'int', 'float', or 'bool'} perdeu a vírgula antes do
+  \texttt{or};
+\item um \texttt{self} usado fora de método gerava cinco mensagens
+  numa linha, e passou a gerar uma;
+\item com as mensagens já iguais, o \texttt{cabal test} falhou nos 14
+  \texttt{.err} do enunciado, porque eles terminam com uma linha em
+  branco; o \texttt{-{}-check} passou a imprimi-la;
+\item o \texttt{e03\_funcao\_sem\_return.err}, vazio, recebeu a
+  mensagem do verificador, porque o TP2 exige a regra 5.
+\end{itemize}
+
+\subsection*{Prompt 2}
+
+\begin{quote}
+faca os commits mas sem coautor do claude
+\end{quote}
+
+\textbf{Resposta.} Foram feitos seis commits, em nome da autora e sem a
+linha de coautoria que a ferramenta coloca por padrão: posição do
+operador nos parsers, verificador de tipos, interpretador, opções da
+linha de comando, testes e documentação. O \texttt{minipython.cabal},
+que tinha trechos de quatro desses commits, foi dividido entre eles.
+Cada commit foi compilado com \texttt{-Werror} e testado num diretório
+de trabalho separado: os quatro primeiros passaram nos 88 testes do
+TP1 e os dois últimos nos 106. Não houve modificação.
+
+\subsection*{Prompt 3}
+
+\begin{quote}
+Sim, dar push
+\end{quote}
+
+\textbf{Resposta.} Os seis commits foram enviados para o GitHub. Não
+houve modificação.
+
+\subsection*{Prompt 4}
+
+\begin{quote}
+Sim, escrever relatório
+\end{quote}
+
+\textbf{Resposta.} A ferramenta escreveu este relatório e este
+apêndice, em arquivos separados do relatório do TP1, a partir do
+código, dos testes e do histórico da sessão, e compilou o PDF
+conferindo o limite de oito páginas.
+
+\subsection*{Avaliação}
+
+O código veio da ferramenta, mas a maior parte dos problemas foi
+encontrada pelos testes: os \texttt{.err} do enunciado, que mostraram a
+questão da posição e da linha em branco, e a comparação com o Python,
+que mostrou a regra das variáveis globais. Onde a especificação é
+omissa a ferramenta tomou decisões (escopo por bloco, \texttt{+} entre
+strings, \texttt{==} para qualquer tipo, a regra das globais), e todas
+estão descritas na Seção 2 e no README, para que possam ser avaliadas.

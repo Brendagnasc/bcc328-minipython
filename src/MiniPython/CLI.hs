@@ -11,6 +11,8 @@ data Mode
   | ParseRD
   | ParsePEG
   | ParseLALR
+  | Check
+  | Interpret
   deriving (Eq, Show)
 
 -- | Resultado da analise dos argumentos.
@@ -38,6 +40,8 @@ modeOf "--lex"        = Just Lex
 modeOf "--parse-rd"   = Just ParseRD
 modeOf "--parse-peg"  = Just ParsePEG
 modeOf "--parse-lalr" = Just ParseLALR
+modeOf "--check"      = Just Check
+modeOf "--run"        = Just Interpret
 modeOf _              = Nothing
 
 -- | Valida a entrada antes de aceitar a execucao.
@@ -46,7 +50,7 @@ dispatch m file
   | take 1 file == "-" = BadUsage ("opcao desconhecida: " ++ file)
   | otherwise          = Run m file
 
--- | Texto da secao 6 do enunciado.
+-- | Texto da secao 6 do enunciado do TP1, com as opcoes do TP2.
 usage :: String
 usage = unlines
   [ "mpyc [OPÇÃO] <arquivo.mpy>"
@@ -56,6 +60,8 @@ usage = unlines
   , "  --parse-rd        Executa o analisador descendente recursivo e imprime a AST."
   , "  --parse-peg       Executa o analisador PEG e imprime a AST."
   , "  --parse-lalr      Executa o analisador LALR e imprime a AST."
+  , "  --check           Executa a verificação de tipos e reporta erros semânticos."
+  , "  --run             Verifica tipos e interpreta o programa."
   , "  --help            Exibe esta ajuda."
   , ""
   , "Se nenhuma opção for fornecida, o comportamento padrão é --parse-rd."

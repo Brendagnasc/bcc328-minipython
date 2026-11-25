@@ -11,17 +11,20 @@ import MiniPython.Frontend.Parser.RecursiveDescent (parseProgram)
 import MiniPython.Frontend.Pretty.MiniPythonPretty (toTree)
 import MiniPython.Frontend.Syntax.MiniPythonSyntax (Program)
 import MiniPython.Frontend.Syntax.Validate (validate)
-import MiniPython.Utils.Error (Error, formatError)
+import MiniPython.Interpreter.Interp (runProgram, stdConsole)
+import MiniPython.Semantic.TypeChecker (typeCheck)
+import MiniPython.Utils.Error (Error, formatError, formatErrors)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath (takeFileName)
-import System.IO (hPutStr, hPutStrLn, hSetEncoding, stderr, stdout)
+import System.IO (hFlush, hPutStr, hPutStrLn, hSetEncoding, stderr, stdin, stdout)
 
 main :: IO ()
 main = do
   -- Fonte e saidas sempre em UTF-8, qualquer que seja o locale: as
   -- mensagens de erro lexico tem acento, como nos arquivos .err.
   setLocaleEncoding utf8
+  hSetEncoding stdin utf8
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
   args <- getArgs
@@ -45,11 +48,32 @@ run mode file src = do
     ParseRD   -> printAst (parseProgram toks)
     ParsePEG  -> printAst (parseProgramPEG src toks)
     ParseLALR -> printAst (parseProgramLALR toks)
+    Check     -> checked >> pure ()
+    Interpret -> do
+      prog <- checked
+      r <- runProgram stdConsole prog
+      -- o que o programa ja imprimiu sai antes da mensagem de erro
+      hFlush stdout
+      _ <- orAbort file r
+      pure ()
   where
     printAst :: Either Error Program -> IO ()
     printAst result = do
       prog <- orAbort file (result >>= validate)
       putStrLn (drawTree (toTree prog))
+
+    -- Verificacao de tipos sobre a AST do descendente recursivo. O
+    -- verificador ja trata return, break e continue fora de lugar, entao
+    -- validate nao e chamado. Com erro, todos vao para stderr e o
+    -- programa nao e executado.
+    checked :: IO Program
+    checked = do
+      prog <- orAbort file (scan src >>= layout >>= parseProgram)
+      case typeCheck prog of
+        [] -> pure prog
+        errs -> do
+          hPutStr stderr (formatErrors (takeFileName file) errs)
+          exitFailure
 
 -- | Imprime o erro em stderr e encerra. Como nos arquivos .err, a
 -- mensagem leva so o nome do arquivo, sem o diretorio.

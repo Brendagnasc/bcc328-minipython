@@ -1,0 +1,12 @@
+class Ponto:
+    x: int
+    y: int
+    def __init__(self, x: int, y: int) -> None:
+        self.x = x
+        self.y = y
+
+def main() -> None:
+    p: Ponto = Ponto(3, 4)
+    print(str(p.x + p.z))
+
+main()

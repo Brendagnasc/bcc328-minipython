@@ -1,0 +1,10 @@
+def classifica(n: int) -> str:
+    if n > 0:
+        return "positivo"
+    elif n < 0:
+        return "negativo"
+
+def main() -> None:
+    print(classifica(0))
+
+main()

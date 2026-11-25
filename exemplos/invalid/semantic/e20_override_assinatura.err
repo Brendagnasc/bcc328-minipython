@@ -1,0 +1,2 @@
+e20_override_assinatura.mpy:9:5: error: method 'area' overrides 'Forma.area' with a different signature: expected '() -> float', got '() -> int'
+

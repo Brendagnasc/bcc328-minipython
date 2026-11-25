@@ -1,0 +1,9 @@
+def main() -> None:
+    n: int = 5
+    if n > 0:
+        sinal: str = "positivo"
+    else:
+        sinal: str = "negativo"
+    print(sinal)
+
+main()

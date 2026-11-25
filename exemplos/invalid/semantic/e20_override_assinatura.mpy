@@ -1,0 +1,16 @@
+class Forma:
+    def area(self) -> float:
+        return 0.0
+
+class Quadrado(Forma):
+    lado: float
+    def __init__(self, lado: float) -> None:
+        self.lado = lado
+    def area(self) -> int:
+        return 1
+
+def main() -> None:
+    q: Quadrado = Quadrado(2.0)
+    print(str(q.area()))
+
+main()

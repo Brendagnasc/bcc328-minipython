@@ -1,0 +1,11 @@
+def media(xs: list[int]) -> int:
+    total: int = 0
+    for x in xs:
+        total += x
+    return total // len(xs)
+
+def main() -> None:
+    print(str(media([4, 8])))
+    print(str(media([])))
+
+main()

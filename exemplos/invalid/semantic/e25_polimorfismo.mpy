@@ -1,0 +1,9 @@
+def identidade(x: a) -> a:
+    return x
+
+def primeiro(xs: list[a]) -> a:
+    return xs[0]
+
+n: int = identidade("ola")
+s: str = primeiro([1, 2, 3])
+print(s)

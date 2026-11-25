@@ -1,0 +1,514 @@
+Casos de teste do verificador de tipos e do interpretador
+Brenda Gabrielle Alves Nascimento, 24.1.4011
+BCC328 - Trabalho Pratico 2
+
+Programas validos: saida de mpyc --run com a entrada mostrada.
+Programas com erro: saida de erro de mpyc --check (igual ao .err).
+
+====================================================================
+exemplos/especificacao/secao_9_01_mdc.mpy  (--run)
+====================================================================
+def mdc(a: int, b: int) -> int:
+    while b != 0:
+        t: int = b
+        b = a % b
+        a = t
+    return a
+
+def main() -> None:
+    a: int = int(input())
+    b: int = int(input())
+    print(str(mdc(a, b)))
+
+main()
+---- entrada
+48
+18
+---- saida
+6
+
+====================================================================
+exemplos/especificacao/secao_9_02_fibonacci.mpy  (--run)
+====================================================================
+def fib(n: int) -> int:
+    if n <= 1:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+def main() -> None:
+    n: int = int(input())
+    i: int = 0
+    while i <= n:
+        print(str(fib(i)))
+        i = i + 1
+
+main()
+---- entrada
+10
+---- saida
+0
+1
+1
+2
+3
+5
+8
+13
+21
+34
+55
+
+====================================================================
+exemplos/especificacao/secao_9_03_busca_linear.mpy  (--run)
+====================================================================
+def busca(arr: list[int], val: int) -> int:
+    i: int = 0
+    while i < len(arr):
+        if arr[i] == val:
+            return i
+        i += 1
+    return -1
+
+def main() -> None:
+    n: int = int(input())
+    arr: list[int] = []
+    i: int = 0
+    while i < n:
+        append(arr, int(input()))
+        i += 1
+    val: int = int(input())
+    pos: int = busca(arr, val)
+    if pos >= 0:
+        print("Encontrado na posicao " + str(pos))
+    else:
+        print("Nao encontrado")
+
+main()
+---- entrada
+5
+4
+8
+15
+16
+23
+15
+---- saida
+Encontrado na posicao 2
+
+====================================================================
+exemplos/especificacao/secao_9_04_selecao.mpy  (--run)
+====================================================================
+def min_idx(arr: list[int], inicio: int) -> int:
+    m: int = inicio
+    i: int = inicio + 1
+    while i < len(arr):
+        if arr[i] < arr[m]:
+            m = i
+        i += 1
+    return m
+
+def selection_sort(arr: list[int]) -> None:
+    n: int = len(arr)
+    i: int = 0
+    while i < n:
+        j: int = min_idx(arr, i)
+        t: int = arr[i]
+        arr[i] = arr[j]
+        arr[j] = t
+        i += 1
+
+def main() -> None:
+    n: int = int(input())
+    arr: list[int] = []
+    i: int = 0
+    while i < n:
+        append(arr, int(input()))
+        i += 1
+    selection_sort(arr)
+    for x in arr:
+        print(str(x))
+
+main()
+---- entrada
+6
+5
+2
+9
+1
+7
+3
+---- saida
+1
+2
+3
+5
+7
+9
+
+====================================================================
+exemplos/especificacao/secao_9_08_alta_ordem.mpy  (--run)
+====================================================================
+def dobro(x: int) -> int:
+    return x * 2
+
+def positivo(x: int) -> bool:
+    return x > 0
+
+def map(f: (int) -> int, xs: list[int]) -> list[int]:
+    resultado: list[int] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def filter(p: (int) -> bool, xs: list[int]) -> list[int]:
+    resultado: list[int] = []
+    for x in xs:
+        if p(x):
+            append(resultado, x)
+    return resultado
+
+def main() -> None:
+    xs: list[int] = [-3, -1, 0, 2, 4, 7]
+    dobrados: list[int] = map(dobro, xs)
+    positivos: list[int] = filter(positivo, dobrados)
+    for x in positivos:
+        print(str(x))
+
+main()
+---- saida
+4
+8
+14
+
+====================================================================
+exemplos/especificacao/secao_9_11_formas.mpy  (--run)
+====================================================================
+class Forma:
+    def area(self) -> float:
+        return 0.0
+    def perimetro(self) -> float:
+        return 0.0
+    def descricao(self) -> str:
+        return "area=" + str(self.area()) + " perimetro=" + str(self.perimetro())
+
+class Retangulo(Forma):
+    largura: float
+    altura: float
+    def __init__(self, largura: float, altura: float) -> None:
+        self.largura = largura
+        self.altura = altura
+    def area(self) -> float:
+        return self.largura * self.altura
+    def perimetro(self) -> float:
+        return 2.0 * (self.largura + self.altura)
+
+class Quadrado(Retangulo):
+    def __init__(self, lado: float) -> None:
+        Retangulo.__init__(self, lado, lado)
+
+def imprimir(f: Forma) -> None:
+    print(f.descricao())
+
+def main() -> None:
+    r: Retangulo = Retangulo(3.0, 4.0)
+    q: Quadrado = Quadrado(5.0)
+    imprimir(r)
+    imprimir(q)
+
+main()
+---- saida
+area=12.0 perimetro=14.0
+area=25.0 perimetro=20.0
+
+====================================================================
+exemplos/especificacao/secao_9_12_pilha.mpy  (--run)
+====================================================================
+class Pilha:
+    dados: list[int]
+    topo: int
+    def __init__(self) -> None:
+        self.dados = []
+        self.topo = 0
+    def push(self, x: int) -> None:
+        append(self.dados, x)
+        self.topo = self.topo + 1
+    def pop(self) -> int:
+        self.topo = self.topo - 1
+        return self.dados[self.topo]
+    def vazia(self) -> bool:
+        return self.topo == 0
+
+def main() -> None:
+    p: Pilha = Pilha()
+    p.push(10)
+    p.push(20)
+    p.push(30)
+    while not p.vazia():
+        print(str(p.pop()))
+
+main()
+---- saida
+30
+20
+10
+
+====================================================================
+exemplos/especificacao/secao_9_15_lambdas.mpy  (--run)
+====================================================================
+def map(f: (a) -> b, xs: list[a]) -> list[b]:
+    resultado: list[b] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def filter(p: (a) -> bool, xs: list[a]) -> list[a]:
+    resultado: list[a] = []
+    for x in xs:
+        if p(x):
+            append(resultado, x)
+    return resultado
+
+def fold(f: (b, a) -> b, acc: b, xs: list[a]) -> b:
+    for x in xs:
+        acc = f(acc, x)
+    return acc
+
+def compose(f: (b) -> c, g: (a) -> b) -> (a) -> c:
+    return lambda x: f(g(x))
+
+def multiplica_por(n: int) -> (int) -> int:
+    return lambda x: x * n
+
+nums: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+pares: list[int]     = filter(lambda x: x % 2 == 0, nums)
+impares: list[int]   = filter(lambda x: x % 2 != 0, nums)
+quadrados: list[int] = map(lambda x: x * x, nums)
+soma: int            = fold(lambda acc, x: acc + x, 0, nums)
+produto: int         = fold(lambda acc, x: acc * x, 1, nums)
+
+print(str(soma))     # 55
+print(str(produto))  # 3628800
+
+dobrar: (int) -> int        = multiplica_por(2)
+triplicar: (int) -> int     = multiplica_por(3)
+dobra_e_quadra: (int) -> int = compose(lambda x: x * x, dobrar)
+
+for x in pares:
+    print(str(dobrar(x)))
+
+print(str(dobra_e_quadra(3)))   # (3*2)^2 = 36
+
+palavras: list[str] = ["banana", "abacaxi", "laranja", "uva", "kiwi"]
+longas: list[str]   = filter(lambda s: len(s) > 4, palavras)
+for p in longas:
+    print(p)
+---- saida
+55
+3628800
+4
+8
+12
+16
+20
+36
+banana
+abacaxi
+laranja
+
+====================================================================
+exemplos/invalid/semantic/e05_variavel_nao_declarada.mpy  (--check)
+====================================================================
+def main() -> None:
+    x: int = 5
+    print(str(y))
+
+main()
+---- saida
+e05_variavel_nao_declarada.mpy:3:15: error: undeclared variable: 'y'
+
+
+====================================================================
+exemplos/invalid/semantic/e16_int_mais_str.mpy  (--check)
+====================================================================
+def main() -> None:
+    n: int = 10
+    s: str = "itens: "
+    print(n + s)
+
+main()
+---- saida
+e16_int_mais_str.mpy:4:13: error: operator '+' requires operands of the same type (int or float), got 'int' and 'str'
+e16_int_mais_str.mpy:4:10: error: incompatible types: 'str' and 'int'
+
+
+====================================================================
+exemplos/invalid/semantic/e04_aridade_errada.mpy  (--check)
+====================================================================
+def soma(a: int, b: int) -> int:
+    return a + b
+
+def main() -> None:
+    print(str(soma(1, 2, 3)))
+
+main()
+---- saida
+e04_aridade_errada.mpy:5:19: error: incompatible types: '(int, int) -> int' and '(int, int, int) -> ?0'
+
+
+====================================================================
+exemplos/invalid/semantic/e03_funcao_sem_return.mpy  (--check)
+====================================================================
+def f(x: int) -> int:
+    if x > 0:
+        return x
+
+f(5)
+---- saida
+e03_funcao_sem_return.mpy:1:1: error: missing return in function 'f'
+
+
+====================================================================
+exemplos/invalid/semantic/e17_break_fora_laco.mpy  (--check)
+====================================================================
+def procura(xs: list[int], alvo: int) -> bool:
+    for x in xs:
+        if x == alvo:
+            return True
+    if alvo < 0:
+        break
+    return False
+
+def main() -> None:
+    print(str(procura([1, 2, 3], 2)))
+    continue
+
+main()
+---- saida
+e17_break_fora_laco.mpy:6:9: error: 'break' outside a loop
+e17_break_fora_laco.mpy:11:5: error: 'continue' outside a loop
+
+
+====================================================================
+exemplos/invalid/semantic/e18_campo_inexistente.mpy  (--check)
+====================================================================
+class Ponto:
+    x: int
+    y: int
+    def __init__(self, x: int, y: int) -> None:
+        self.x = x
+        self.y = y
+
+def main() -> None:
+    p: Ponto = Ponto(3, 4)
+    print(str(p.x + p.z))
+
+main()
+---- saida
+e18_campo_inexistente.mpy:10:22: error: class 'Ponto' has no field 'z'
+
+
+====================================================================
+Demais programas com erro de tipo (mpyc --check)
+====================================================================
+
+-- exemplos/invalid/semantic/e01_int_mais_float.mpy
+e01_int_mais_float.mpy:4:18: error: operator '+' requires operands of the same type (int or float), got 'int' and 'float'
+e01_int_mais_float.mpy:4:5: error: incompatible types: 'float' and 'int'
+
+-- exemplos/invalid/semantic/e02_indice_bool.mpy
+e02_indice_bool.mpy:3:16: error: index must be 'int', got 'bool'
+
+-- exemplos/invalid/semantic/e06_modulo_float.mpy
+e06_modulo_float.mpy:4:18: error: operator '%' requires 'int' operands, got 'float' and 'float'
+e06_modulo_float.mpy:4:5: error: incompatible types: 'float' and 'int'
+
+-- exemplos/invalid/semantic/e07_comparacao_tipos_incompativeis.mpy
+e07_comparacao_tipos_incompativeis.mpy:4:10: error: operator '==' requires operands of the same type, got 'int' and 'str'
+
+-- exemplos/invalid/semantic/e08_append_tipo_errado.mpy
+e08_append_tipo_errado.mpy:3:11: error: incompatible types: 'int' and 'str'
+
+-- exemplos/invalid/semantic/e09_lista_mista.mpy
+e09_lista_mista.mpy:2:21: error: incompatible types: 'int' and 'float'
+
+-- exemplos/invalid/semantic/e10_divisao_inteira_float.mpy
+e10_divisao_inteira_float.mpy:4:16: error: operator '//' requires 'int' operands, got 'float' and 'int'
+
+-- exemplos/invalid/semantic/e11_atribuicao_tipo_errado.mpy
+e11_atribuicao_tipo_errado.mpy:3:5: error: incompatible types: 'int' and 'float'
+
+-- exemplos/invalid/semantic/e12_retorno_tipo_errado.mpy
+e12_retorno_tipo_errado.mpy:2:5: error: incompatible types: 'int' and 'str'
+
+-- exemplos/invalid/semantic/e13_condicional_nao_bool.mpy
+e13_condicional_nao_bool.mpy:3:8: error: incompatible types: 'bool' and 'int'
+
+-- exemplos/invalid/semantic/e14_chamada_nao_funcao.mpy
+e14_chamada_nao_funcao.mpy:3:15: error: incompatible types: 'int' and '(int) -> ?0'
+
+-- exemplos/invalid/semantic/e15_indice_em_nao_lista.mpy
+e15_indice_em_nao_lista.mpy:3:15: error: indexing requires 'list[T]' or 'str', got 'int'
+
+-- exemplos/invalid/semantic/e19_metodo_inexistente.mpy
+e19_metodo_inexistente.mpy:11:16: error: class 'Pilha' has no method 'pop'
+
+-- exemplos/invalid/semantic/e20_override_assinatura.mpy
+e20_override_assinatura.mpy:9:5: error: method 'area' overrides 'Forma.area' with a different signature: expected '() -> float', got '() -> int'
+
+-- exemplos/invalid/semantic/e21_subtipo_invalido.mpy
+e21_subtipo_invalido.mpy:14:10: error: incompatible types: 'Cachorro' and 'Animal'
+e21_subtipo_invalido.mpy:15:5: error: incompatible types: 'Cachorro' and 'Animal'
+
+-- exemplos/invalid/semantic/e22_redeclaracao.mpy
+e22_redeclaracao.mpy:5:1: error: 'soma' is already declared in this scope
+e22_redeclaracao.mpy:2:5: error: 'a' is already declared in this scope
+e22_redeclaracao.mpy:10:5: error: 'total' is already declared in this scope
+
+-- exemplos/invalid/semantic/e23_escopo_bloco.mpy
+e23_escopo_bloco.mpy:7:11: error: undeclared variable: 'sinal'
+
+-- exemplos/invalid/semantic/e24_aridade_metodo.mpy
+e24_aridade_metodo.mpy:9:21: error: incompatible types: '(float) -> Conta' and '() -> ?0'
+e24_aridade_metodo.mpy:10:16: error: incompatible types: '(float) -> None' and '(float, float) -> ?0'
+
+-- exemplos/invalid/semantic/e25_polimorfismo.mpy
+e25_polimorfismo.mpy:7:1: error: incompatible types: 'int' and 'str'
+e25_polimorfismo.mpy:8:1: error: incompatible types: 'str' and 'int'
+
+-- exemplos/invalid/semantic/e26_varios_erros.mpy
+e26_varios_erros.mpy:2:5: error: incompatible types: 'float' and 'int'
+e26_varios_erros.mpy:5:17: error: operator '/' requires operands of the same type (int or float), got 'float' and 'int'
+e26_varios_erros.mpy:8:26: error: incompatible types: 'float' and 'str'
+e26_varios_erros.mpy:9:21: error: operator '+' requires operands of the same type (int or float), got 'str' and 'float'
+e26_varios_erros.mpy:10:15: error: undeclared variable: 'total'
+
+-- exemplos/invalid/semantic/e27_campo_nao_inicializado.mpy
+e27_campo_nao_inicializado.mpy:3:5: error: field 'nota' is not initialized in '__init__'
+
+-- exemplos/invalid/semantic/e28_lambda_tipo.mpy
+e28_lambda_tipo.mpy:9:5: error: incompatible types: 'str' and 'int'
+e28_lambda_tipo.mpy:10:46: error: operator 'and' requires 'bool' operands, got 'int' and 'int'
+e28_lambda_tipo.mpy:10:5: error: incompatible types: 'int' and 'bool'
+
+-- exemplos/invalid/semantic/e29_return_elif.mpy
+e29_return_elif.mpy:1:1: error: missing return in function 'classifica'
+
+-- exemplos/invalid/semantic/e30_self_fora_metodo.mpy
+e30_self_fora_metodo.mpy:6:16: error: 'self' outside a method
+
+====================================================================
+Erros em tempo de execucao (mpyc --run)
+====================================================================
+
+-- exemplos/invalid/runtime/x01_indice_fora.mpy
+somando
+x01_indice_fora.mpy:5:19: error: list index out of range: index 3, length 3
+
+-- exemplos/invalid/runtime/x02_divisao_zero.mpy
+6
+x02_divisao_zero.mpy:5:18: error: integer division by zero
+
+-- exemplos/invalid/runtime/x03_entrada_invalida.mpy
+x03_entrada_invalida.mpy:3:17: error: invalid literal for int(): 'doze'
+

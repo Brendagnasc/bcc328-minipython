@@ -1,0 +1,6 @@
+e26_varios_erros.mpy:2:5: error: incompatible types: 'float' and 'int'
+e26_varios_erros.mpy:5:17: error: operator '/' requires operands of the same type (int or float), got 'float' and 'int'
+e26_varios_erros.mpy:8:26: error: incompatible types: 'float' and 'str'
+e26_varios_erros.mpy:9:21: error: operator '+' requires operands of the same type (int or float), got 'str' and 'float'
+e26_varios_erros.mpy:10:15: error: undeclared variable: 'total'
+

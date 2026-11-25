@@ -1,0 +1,6 @@
+def main() -> None:
+    n: int = 10
+    s: str = "itens: "
+    print(n + s)
+
+main()

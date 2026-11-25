@@ -1,0 +1,18 @@
+class Animal:
+    def falar(self) -> str:
+        return "..."
+
+class Cachorro(Animal):
+    def falar(self) -> str:
+        return "Au!"
+
+def latir(c: Cachorro) -> None:
+    print(c.falar())
+
+def main() -> None:
+    a: Animal = Cachorro()
+    latir(a)
+    c: Cachorro = Animal()
+    latir(c)
+
+main()

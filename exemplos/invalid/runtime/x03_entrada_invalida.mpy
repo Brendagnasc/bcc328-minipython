@@ -1,0 +1,6 @@
+def main() -> None:
+    a: int = int(input())
+    b: int = int(input())
+    print(str(a + b))
+
+main()

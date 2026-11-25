@@ -1,0 +1,12 @@
+def media(xs: list[float]) -> float:
+    soma: float = 0
+    for x in xs:
+        soma = soma + x
+    return soma / len(xs)
+
+def main() -> None:
+    notas: list[float] = [7.5, 8.0, "dez"]
+    print("media: " + media(notas))
+    print(str(total))
+
+main()

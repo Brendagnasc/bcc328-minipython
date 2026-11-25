@@ -1,0 +1,13 @@
+def procura(xs: list[int], alvo: int) -> bool:
+    for x in xs:
+        if x == alvo:
+            return True
+    if alvo < 0:
+        break
+    return False
+
+def main() -> None:
+    print(str(procura([1, 2, 3], 2)))
+    continue
+
+main()

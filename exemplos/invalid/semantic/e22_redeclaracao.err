@@ -1,0 +1,4 @@
+e22_redeclaracao.mpy:5:1: error: 'soma' is already declared in this scope
+e22_redeclaracao.mpy:2:5: error: 'a' is already declared in this scope
+e22_redeclaracao.mpy:10:5: error: 'total' is already declared in this scope
+

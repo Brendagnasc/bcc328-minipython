@@ -1,0 +1,13 @@
+def map(f: (a) -> b, xs: list[a]) -> list[b]:
+    resultado: list[b] = []
+    for x in xs:
+        append(resultado, f(x))
+    return resultado
+
+def main() -> None:
+    nums: list[int] = [1, 2, 3]
+    textos: list[str] = map(lambda x: x * 2, nums)
+    soma: (int, int) -> int = lambda a, b: a and b
+    print(str(len(textos)))
+
+main()

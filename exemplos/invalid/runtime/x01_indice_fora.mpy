@@ -1,0 +1,13 @@
+def soma(xs: list[int]) -> int:
+    s: int = 0
+    i: int = 0
+    while i <= len(xs):
+        s = s + xs[i]
+        i += 1
+    return s
+
+def main() -> None:
+    print("somando")
+    print(str(soma([1, 2, 3])))
+
+main()

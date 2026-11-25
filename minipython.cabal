@@ -15,11 +15,14 @@ extra-doc-files:    CHANGELOG.md
 -- junto no pacote gerado por cabal sdist.
 extra-source-files: exemplos/**/*.mpy
                     exemplos/**/*.err
+                    exemplos/**/*.in
+                    exemplos/**/*.out
                     spec/minipython.md
                     report/relatorio.tex
                     report/uso-ia.tex
                     testes/*.sh
                     testes/saidas-esperadas.txt
+                    testes/saidas-tp2.txt
 
 common warnings
     ghc-options: -Wall -Wcompat -Widentities -Wredundant-constraints -Werror

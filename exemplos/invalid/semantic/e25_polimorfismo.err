@@ -1,0 +1,3 @@
+e25_polimorfismo.mpy:7:1: error: incompatible types: 'int' and 'str'
+e25_polimorfismo.mpy:8:1: error: incompatible types: 'str' and 'int'
+

@@ -1,0 +1,4 @@
+e28_lambda_tipo.mpy:9:5: error: incompatible types: 'str' and 'int'
+e28_lambda_tipo.mpy:10:46: error: operator 'and' requires 'bool' operands, got 'int' and 'int'
+e28_lambda_tipo.mpy:10:5: error: incompatible types: 'int' and 'bool'
+

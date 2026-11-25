@@ -1,0 +1,13 @@
+class Pilha:
+    dados: list[int]
+    def __init__(self) -> None:
+        self.dados = []
+    def push(self, x: int) -> None:
+        append(self.dados, x)
+
+def main() -> None:
+    p: Pilha = Pilha()
+    p.push(1)
+    print(str(p.pop()))
+
+main()

@@ -1,0 +1,2 @@
+e27_campo_nao_inicializado.mpy:3:5: error: field 'nota' is not initialized in '__init__'
+

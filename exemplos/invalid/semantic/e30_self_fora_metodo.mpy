@@ -1,0 +1,14 @@
+class Contador:
+    valor: int
+    def __init__(self) -> None:
+        self.valor = 0
+
+def incrementa(self) -> None:
+    self.valor = self.valor + 1
+
+def main() -> None:
+    c: Contador = Contador()
+    incrementa(c)
+    print(str(c.valor))
+
+main()

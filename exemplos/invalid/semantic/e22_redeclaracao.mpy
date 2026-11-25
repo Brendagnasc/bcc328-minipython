@@ -1,0 +1,13 @@
+def soma(a: int, b: int) -> int:
+    a: int = 0
+    return a + b
+
+def soma(x: int) -> int:
+    return x
+
+def main() -> None:
+    total: int = 0
+    total: float = 1.5
+    print(str(soma(1, 2)))
+
+main()

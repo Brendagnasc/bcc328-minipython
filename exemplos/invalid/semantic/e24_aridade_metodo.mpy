@@ -1,0 +1,13 @@
+class Conta:
+    saldo: float
+    def __init__(self, saldo: float) -> None:
+        self.saldo = saldo
+    def depositar(self, valor: float) -> None:
+        self.saldo = self.saldo + valor
+
+def main() -> None:
+    c: Conta = Conta()
+    c.depositar(10.0, 2.0)
+    print(str(c.saldo))
+
+main()

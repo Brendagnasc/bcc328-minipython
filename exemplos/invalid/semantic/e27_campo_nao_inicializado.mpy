@@ -1,0 +1,13 @@
+class Aluno:
+    nome: str
+    nota: float
+    def __init__(self, nome: str) -> None:
+        self.nome = nome
+    def aprovado(self) -> bool:
+        return self.nota >= 6.0
+
+def main() -> None:
+    a: Aluno = Aluno("Ana")
+    print(str(a.aprovado()))
+
+main()

@@ -354,12 +354,12 @@ pAssignTail = do
     TkAssign -> do
       alvo <- toLValue e
       _ <- advance
-      SAssign (exprPos e) alvo <$> pExpr
+      SAssign (exprStart e) alvo <$> pExpr
     _ | Just op <- lookup l augOps -> do
       alvo <- toLValue e
       _ <- advance
-      SAugAssign (exprPos e) alvo op <$> pExpr
-    _ -> pure (SExpr (exprPos e) e)
+      SAugAssign (exprStart e) alvo op <$> pExpr
+    _ -> pure (SExpr (exprStart e) e)
 
 -- | Alvos validos sao nome, acesso indexado e acesso a campo (secao 7.2
 -- da especificacao). O erro aponta a expressao recusada.
@@ -368,7 +368,7 @@ toLValue e = case e of
   EVar p n     -> pure (LVar p n)
   EIndex p b i -> pure (LIndex p b i)
   EField p b n -> pure (LField p b n)
-  _            -> failAt (exprPos e) "invalid assignment target"
+  _            -> failAt (exprStart e) "invalid assignment target"
 
 augOps :: [(Lexeme, AugOp)]
 augOps =
@@ -444,7 +444,7 @@ pExpr = do
       if not condicional then pure e else do
         cond <- pOr
         _ <- expect TkElse
-        ECond (exprPos e) e cond <$> pExpr
+        ECond (exprStart e) e cond <$> pExpr
 
 -- | ExprOu ::= ExprE { 'or' ExprE }
 pOr :: Parser Expr
@@ -468,10 +468,10 @@ pNot = do
 pRel :: Parser Expr
 pRel = do
   left <- pAdd
-  l <- peekLexeme
-  case lookup l relOps of
+  t <- peekToken
+  case lookup (tokLexeme t) relOps of
     Nothing -> pure left
-    Just op -> advance >> EBinOp (exprPos left) op left <$> pAdd
+    Just op -> advance >> EBinOp (tokPos t) op left <$> pAdd
 
 -- | ExprAdit ::= ExprMult { ( '+' | '-' ) ExprMult }
 pAdd :: Parser Expr
@@ -489,8 +489,9 @@ pMul = chainLeft pPow mulOps
 pPow :: Parser Expr
 pPow = do
   base <- pUnary
+  t <- peekToken
   pot <- accept TkDStar
-  if pot then EBinOp (exprPos base) Pow base <$> pPow else pure base
+  if pot then EBinOp (tokPos t) Pow base <$> pPow else pure base
 
 -- | ExprUnaria ::= '-' ExprUnaria | ExprPosfixa
 pUnary :: Parser Expr
@@ -509,22 +510,23 @@ pPostfix :: Parser Expr
 pPostfix = pAtom >>= go
   where
     go acc = do
-      l <- peekLexeme
-      case l of
+      t <- peekToken
+      let p = tokPos t
+      case tokLexeme t of
         TkLParen -> do
           _ <- advance
           args <- commaSepUntil TkRParen pExpr
           _ <- expect TkRParen
-          go (ECall (exprPos acc) acc args)
+          go (ECall p acc args)
         TkLBracket -> do
           _ <- advance
           idx <- pExpr
           _ <- expect TkRBracket
-          go (EIndex (exprPos acc) acc idx)
+          go (EIndex p acc idx)
         TkDot -> do
           _ <- advance
           (_, n) <- expectIdent
-          go (EField (exprPos acc) acc n)
+          go (EField p acc n)
         _ -> pure acc
 
 -- | Atomo, conforme a producao de mesmo nome na GLC.
@@ -565,13 +567,13 @@ chainLeft :: Parser Expr -> [(Lexeme, BinOp)] -> Parser Expr
 chainLeft next ops = next >>= go
   where
     go acc = do
-      l <- peekLexeme
-      case lookup l ops of
+      t <- peekToken
+      case lookup (tokLexeme t) ops of
         Nothing -> pure acc
         Just op -> do
           _ <- advance
           right <- next
-          go (EBinOp (exprPos acc) op acc right)
+          go (EBinOp (tokPos t) op acc right)
 
 isIdent :: Lexeme -> Bool
 isIdent (TkIdent _) = True

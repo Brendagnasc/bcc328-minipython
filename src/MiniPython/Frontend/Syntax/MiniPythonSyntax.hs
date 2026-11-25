@@ -1,9 +1,12 @@
 -- | Arvore sintatica abstrata da linguagem MiniPython.
 --
--- Todo no carrega a posicao (linha e coluna) do token que o iniciou,
--- conforme exigido pelo enunciado. A posicao reutiliza o tipo Pos do
--- analisador lexico, de modo que ha uma unica nocao de posicao em todo
--- o compilador.
+-- Todo no carrega uma posicao (linha e coluna), conforme exigido pelo
+-- enunciado. Em geral e a do token que inicia a construcao; operador
+-- binario, chamada, indexacao e acesso a campo guardam a posicao do
+-- operador ('+', '(', '[' ou '.'), que e onde o verificador de tipos
+-- aponta os erros, como nos arquivos .err. O inicio da expressao sai
+-- de exprStart. A posicao reutiliza o tipo Pos do analisador lexico,
+-- de modo que ha uma unica nocao de posicao em todo o compilador.
 module MiniPython.Frontend.Syntax.MiniPythonSyntax
   ( Name
   , Program (..)
@@ -21,6 +24,7 @@ module MiniPython.Frontend.Syntax.MiniPythonSyntax
   , UnOp (..)
   , Type (..)
   , exprPos
+  , exprStart
   , stmtPos
   , lvaluePos
   , typePos
@@ -189,6 +193,17 @@ exprPos e = case e of
   EList p _     -> p
   ELambda p _ _ -> p
   ECond p _ _ _ -> p
+
+-- | Posicao do primeiro token da expressao. Difere de exprPos nos nos
+-- que guardam a posicao do operador.
+exprStart :: Expr -> Pos
+exprStart e = case e of
+  EBinOp _ _ a _ -> exprStart a
+  ECall _ f _    -> exprStart f
+  EIndex _ b _   -> exprStart b
+  EField _ b _   -> exprStart b
+  ECond _ a _ _  -> exprStart a
+  _              -> exprPos e
 
 stmtPos :: Stmt -> Pos
 stmtPos s = case s of

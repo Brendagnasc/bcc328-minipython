@@ -96,16 +96,16 @@ mkVarDecl src p n t e = (\ty -> SVarDecl (posAt src p) n ty e) <$> t
 -- | Expressao seguida, ou nao, de '=' ou de um operador aumentado.
 mkAssign :: Expr -> Maybe (Maybe AugOp, Expr) -> R Stmt
 mkAssign e rest = case rest of
-  Nothing              -> Right (SExpr (exprPos e) e)
-  Just (Nothing, v)    -> (\lv -> SAssign (exprPos e) lv v) <$> toLValue e
-  Just (Just op, v)    -> (\lv -> SAugAssign (exprPos e) lv op v) <$> toLValue e
+  Nothing              -> Right (SExpr (exprStart e) e)
+  Just (Nothing, v)    -> (\lv -> SAssign (exprStart e) lv v) <$> toLValue e
+  Just (Just op, v)    -> (\lv -> SAugAssign (exprStart e) lv op v) <$> toLValue e
 
 toLValue :: Expr -> R LValue
 toLValue e = case e of
   EVar p n     -> Right (LVar p n)
   EIndex p b i -> Right (LIndex p b i)
   EField p b n -> Right (LField p b n)
-  _            -> Left (Error (exprPos e) "invalid assignment target")
+  _            -> Left (Error (exprStart e) "invalid assignment target")
 
 mkFunType :: Source -> Int -> [R Type] -> R Type -> R Type
 mkFunType src p ts r = TyFun (posAt src p) <$> sequence ts <*> r
@@ -131,34 +131,37 @@ mkNumber src p i f x = case (f, x) of
 
 mkCond :: Expr -> Maybe (Expr, Expr) -> Expr
 mkCond e Nothing       = e
-mkCond e (Just (c, a)) = ECond (exprPos e) e c a
+mkCond e (Just (c, a)) = ECond (exprStart e) e c a
 
-mkRel :: Expr -> Maybe (BinOp, Expr) -> Expr
-mkRel e Nothing        = e
-mkRel e (Just (op, r)) = EBinOp (exprPos e) op e r
+-- Os operadores binarios e posfixos guardam o deslocamento do operador,
+-- capturado com @ logo antes dele na gramatica.
 
-mkPow :: Expr -> Maybe Expr -> Expr
-mkPow b Nothing  = b
-mkPow b (Just e) = EBinOp (exprPos b) Pow b e
+mkRel :: Source -> Expr -> Maybe (Int, BinOp, Expr) -> Expr
+mkRel _ e Nothing             = e
+mkRel src e (Just (q, op, r)) = EBinOp (posAt src q) op e r
+
+mkPow :: Source -> Expr -> Maybe (Int, Expr) -> Expr
+mkPow _ b Nothing          = b
+mkPow src b (Just (q, e))  = EBinOp (posAt src q) Pow b e
 
 -- | Cadeia associativa a esquerda.
-chain :: Expr -> [(BinOp, Expr)] -> Expr
-chain = foldl (\acc (op, r) -> EBinOp (exprPos acc) op acc r)
+chain :: Source -> Expr -> [(Int, BinOp, Expr)] -> Expr
+chain src = foldl (\acc (q, op, r) -> EBinOp (posAt src q) op acc r)
 
-chainOf :: BinOp -> Expr -> [Expr] -> Expr
-chainOf op e es = chain e [(op, r) | r <- es]
+chainOf :: Source -> BinOp -> Expr -> [(Int, Expr)] -> Expr
+chainOf src op e es = chain src e [(q, op, r) | (q, r) <- es]
 
 data Postfix
-  = PCall [Expr]
-  | PIndex Expr
-  | PField Name
+  = PCall Int [Expr]
+  | PIndex Int Expr
+  | PField Int Name
 
-mkPostfix :: Expr -> [Postfix] -> Expr
-mkPostfix = foldl step
+mkPostfix :: Source -> Expr -> [Postfix] -> Expr
+mkPostfix src = foldl step
   where
-    step e (PCall args) = ECall (exprPos e) e args
-    step e (PIndex i)   = EIndex (exprPos e) e i
-    step e (PField n)   = EField (exprPos e) e n
+    step e (PCall q args) = ECall (posAt src q) e args
+    step e (PIndex q i)   = EIndex (posAt src q) e i
+    step e (PField q n)   = EField (posAt src q) e n
 
 [pegGrammar|
   %name   miniPython
@@ -312,30 +315,30 @@ mkPostfix = foldl step
                           / e:disj c:condtail?         { mkCond e c }
   condtail  :: (Expr, Expr) <- condkw c:disj "else" ![a-zA-Z0-9_] sp a:expr  { (c, a) }
   condkw    :: ()        <- "if" ![a-zA-Z0-9_] sp
-  disj      :: Expr      <- e:conj es:(orkw r:conj)*   { chainOf Or e es }
+  disj      :: Expr      <- e:conj es:(q:@ orkw r:conj { (q, r) })*  { chainOf src Or e es }
   orkw      :: ()        <- "or" ![a-zA-Z0-9_] sp
-  conj      :: Expr      <- e:neg es:(andkw r:neg)*    { chainOf And e es }
+  conj      :: Expr      <- e:neg es:(q:@ andkw r:neg { (q, r) })*   { chainOf src And e es }
   andkw     :: ()        <- "and" ![a-zA-Z0-9_] sp
   neg       :: Expr      <- p:@ "not" ![a-zA-Z0-9_] sp e:neg  { EUnOp (posAt src p) Not e }
                           / e:rel
-  rel       :: Expr      <- e:sum r:reltail?           { mkRel e r }
-  reltail   :: (BinOp, Expr) <- o:relop r:sum          { (o, r) }
+  rel       :: Expr      <- e:sum r:reltail?           { mkRel src e r }
+  reltail   :: (Int, BinOp, Expr) <- q:@ o:relop r:sum  { (q, o, r) }
   relop     :: BinOp     <- "==" sp { Eq } / "!=" sp { Neq } / "<=" sp { Le }
                           / ">=" sp { Ge } / '<' sp { Lt } / '>' sp { Gt }
-  sum       :: Expr      <- e:term es:(o:addop r:term { (o, r) })*  { chain e es }
+  sum       :: Expr      <- e:term es:(q:@ o:addop r:term { (q, o, r) })*  { chain src e es }
   addop     :: BinOp     <- '+' !'=' sp { Add } / '-' ![=>] sp { Sub }
-  term      :: Expr      <- e:power es:(o:mulop r:power { (o, r) })*  { chain e es }
+  term      :: Expr      <- e:power es:(q:@ o:mulop r:power { (q, o, r) })*  { chain src e es }
   mulop     :: BinOp     <- "//" !'=' sp { FloorDiv } / '/' !'=' sp { Div }
                           / '%' !'=' sp { Mod } / '*' ![*=] sp { Mul }
-  power     :: Expr      <- b:unary r:powtail?         { mkPow b r }
-  powtail   :: Expr      <- powkw e:power
+  power     :: Expr      <- b:unary r:powtail?         { mkPow src b r }
+  powtail   :: (Int, Expr) <- q:@ powkw e:power        { (q, e) }
   powkw     :: ()        <- "**" sp
   unary     :: Expr      <- p:@ '-' ![=>] sp e:unary   { EUnOp (posAt src p) Neg e }
                           / e:postfix
-  postfix   :: Expr      <- a:atom ps:post*            { mkPostfix a ps }
-  post      :: Postfix   <- lpar args:(sp xs:exprs ')')_~ sp  { PCall args }
-                          / lbrk i:(sp x:expr ']')_~ sp       { PIndex i }
-                          / dot n:name                        { PField n }
+  postfix   :: Expr      <- a:atom ps:post*            { mkPostfix src a ps }
+  post      :: Postfix   <- q:@ lpar args:(sp xs:exprs ')')_~ sp  { PCall q args }
+                          / q:@ lbrk i:(sp x:expr ']')_~ sp       { PIndex q i }
+                          / q:@ dot n:name                        { PField q n }
   lpar      :: ()        <- '('
   lbrk      :: ()        <- '['
   dot       :: ()        <- '.' sp

@@ -211,7 +211,7 @@ ComandoSimples :: { Stmt }
   | ident ':' Tipo '=' Expr         { SVarDecl (tokPos $1) (identName $1) $3 $5 }
   | Expr '=' Expr                   {% mkAssign $1 $3 }
   | Expr OpAumentado Expr           {% mkAugAssign $1 $2 $3 }
-  | Expr                            { SExpr (exprPos $1) $1 }
+  | Expr                            { SExpr (exprStart $1) $1 }
 
 OpAumentado :: { AugOp }
   : '+='                            { AddAssign }
@@ -247,29 +247,29 @@ TipoList :: { [Type] }
 -- o unico movimento possivel e deslocar.
 Expr :: { Expr }
   : 'lambda' LambdaParams ':' Expr      { ELambda (tokPos $1) (reverse $2) $4 }
-  | Operacao 'if' Operacao 'else' Expr  { ECond (exprPos $1) $1 $3 $5 }
+  | Operacao 'if' Operacao 'else' Expr  { ECond (exprStart $1) $1 $3 $5 }
   | Operacao                            { $1 }
 
 -- Todos os operadores numa producao so, sem estratificacao: a
 -- precedencia vem das diretivas %left, %right e %nonassoc.
 Operacao :: { Expr }
-  : Operacao 'or' Operacao          { EBinOp (exprPos $1) Or $1 $3 }
-  | Operacao 'and' Operacao         { EBinOp (exprPos $1) And $1 $3 }
+  : Operacao 'or' Operacao          { EBinOp (tokPos $2) Or $1 $3 }
+  | Operacao 'and' Operacao         { EBinOp (tokPos $2) And $1 $3 }
   | 'not' Operacao                  { EUnOp (tokPos $1) Not $2 }
-  | Operacao '==' Operacao          { EBinOp (exprPos $1) Eq $1 $3 }
-  | Operacao '!=' Operacao          { EBinOp (exprPos $1) Neq $1 $3 }
-  | Operacao '<' Operacao           { EBinOp (exprPos $1) Lt $1 $3 }
-  | Operacao '<=' Operacao          { EBinOp (exprPos $1) Le $1 $3 }
-  | Operacao '>' Operacao           { EBinOp (exprPos $1) Gt $1 $3 }
-  | Operacao '>=' Operacao          { EBinOp (exprPos $1) Ge $1 $3 }
-  | Operacao '+' Operacao           { EBinOp (exprPos $1) Add $1 $3 }
-  | Operacao '-' Operacao           { EBinOp (exprPos $1) Sub $1 $3 }
-  | Operacao '*' Operacao           { EBinOp (exprPos $1) Mul $1 $3 }
-  | Operacao '/' Operacao           { EBinOp (exprPos $1) Div $1 $3 }
-  | Operacao '//' Operacao          { EBinOp (exprPos $1) FloorDiv $1 $3 }
-  | Operacao '%' Operacao           { EBinOp (exprPos $1) Mod $1 $3 }
+  | Operacao '==' Operacao          { EBinOp (tokPos $2) Eq $1 $3 }
+  | Operacao '!=' Operacao          { EBinOp (tokPos $2) Neq $1 $3 }
+  | Operacao '<' Operacao           { EBinOp (tokPos $2) Lt $1 $3 }
+  | Operacao '<=' Operacao          { EBinOp (tokPos $2) Le $1 $3 }
+  | Operacao '>' Operacao           { EBinOp (tokPos $2) Gt $1 $3 }
+  | Operacao '>=' Operacao          { EBinOp (tokPos $2) Ge $1 $3 }
+  | Operacao '+' Operacao           { EBinOp (tokPos $2) Add $1 $3 }
+  | Operacao '-' Operacao           { EBinOp (tokPos $2) Sub $1 $3 }
+  | Operacao '*' Operacao           { EBinOp (tokPos $2) Mul $1 $3 }
+  | Operacao '/' Operacao           { EBinOp (tokPos $2) Div $1 $3 }
+  | Operacao '//' Operacao          { EBinOp (tokPos $2) FloorDiv $1 $3 }
+  | Operacao '%' Operacao           { EBinOp (tokPos $2) Mod $1 $3 }
   | '-' Operacao %prec NEG          { EUnOp (tokPos $1) Neg $2 }
-  | Operacao '**' Operacao          { EBinOp (exprPos $1) Pow $1 $3 }
+  | Operacao '**' Operacao          { EBinOp (tokPos $2) Pow $1 $3 }
   | Posfixa                         { $1 }
 
 LambdaParams :: { [Name] }
@@ -281,9 +281,9 @@ LambdaList :: { [Name] }
   | LambdaList ',' ident            { identName $3 : $1 }
 
 Posfixa :: { Expr }
-  : Posfixa '(' Args ')'            { ECall (exprPos $1) $1 (reverse $3) }
-  | Posfixa '[' Expr ']'            { EIndex (exprPos $1) $1 $3 }
-  | Posfixa '.' ident               { EField (exprPos $1) $1 (identName $3) }
+  : Posfixa '(' Args ')'            { ECall (tokPos $2) $1 (reverse $3) }
+  | Posfixa '[' Expr ']'            { EIndex (tokPos $2) $1 $3 }
+  | Posfixa '.' ident               { EField (tokPos $2) $1 (identName $3) }
   | Atomo                           { $1 }
 
 Args :: { [Expr] }
@@ -400,17 +400,17 @@ mkListType nome colchete elemT = case tokLexeme nome of
 mkAssign :: Expr -> Expr -> Either Error Stmt
 mkAssign alvo val = do
   lv <- toLValue alvo
-  pure (SAssign (exprPos alvo) lv val)
+  pure (SAssign (exprStart alvo) lv val)
 
 mkAugAssign :: Expr -> AugOp -> Expr -> Either Error Stmt
 mkAugAssign alvo op val = do
   lv <- toLValue alvo
-  pure (SAugAssign (exprPos alvo) lv op val)
+  pure (SAugAssign (exprStart alvo) lv op val)
 
 toLValue :: Expr -> Either Error LValue
 toLValue e = case e of
   EVar p n     -> Right (LVar p n)
   EIndex p b i -> Right (LIndex p b i)
   EField p b n -> Right (LField p b n)
-  _            -> Left (Error (exprPos e) "invalid assignment target")
+  _            -> Left (Error (exprStart e) "invalid assignment target")
 }

@@ -1,7 +1,7 @@
 cabal-version:      3.0
 name:               minipython
-version:            0.1.0.0
-synopsis:           Compilador MiniPython: analise lexica e sintatica (BCC328, UFOP)
+version:            0.2.0.0
+synopsis:           Compilador MiniPython: analise lexica e sintatica, tipos e interpretador (BCC328, UFOP)
 license:            BSD-3-Clause
 license-file:       LICENSE
 author:             Brenda Gabrielle Alves Nascimento

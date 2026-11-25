@@ -2,6 +2,7 @@
 module MiniPython.Utils.Error
   ( Error (..)
   , formatError
+  , formatErrors
   ) where
 
 import MiniPython.Frontend.Lexer.Token (Pos (..))
@@ -20,3 +21,9 @@ formatError file e =
     ++ ":" ++ show (posLine (errPos e))
     ++ ":" ++ show (posCol (errPos e))
     ++ ": error: " ++ errMsg e
+
+-- | Bloco com os erros do verificador de tipos, um por linha. Como nos
+-- arquivos .err de invalid/semantic fornecidos com o enunciado, o bloco
+-- termina com uma linha em branco.
+formatErrors :: FilePath -> [Error] -> String
+formatErrors file es = unlines (map (formatError file) es) ++ "\n"

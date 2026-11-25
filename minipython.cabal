@@ -38,8 +38,11 @@ library
                     , MiniPython.Frontend.Parser.Stream
                     , MiniPython.Frontend.Parser.PEG
                     , MiniPython.Frontend.Parser.Happy.Grammar
+                    , MiniPython.Semantic.Types
+                    , MiniPython.Semantic.TypeChecker
     build-depends:    base ^>=4.18.2.1
                     , containers >=0.6 && <0.8
+                    , mtl >=2.2 && <2.4
                     , megaparsec >=9.5 && <10
                     , typed-peg >=0.6 && <0.7
                     , array >=0.5 && <0.6
